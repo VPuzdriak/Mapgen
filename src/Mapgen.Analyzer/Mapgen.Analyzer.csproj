@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <IsRoslynComponent>true</IsRoslynComponent>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <LangVersion>default</LangVersion>
+        
+        <!-- NuGet Package Metadata -->
+        <PackageId>Mapgen.Analyzer</PackageId>
+        <Version>1.0.0</Version>
+        <Authors>Volodymyr Puzdriak</Authors>
+        <Company>Volodymyr Puzdriak</Company>
+        <Description>A high-performance, compile-time object mapper for .NET using source generators. Mapgen generates all mapping code at compile time, providing zero runtime overhead, full type safety, and excellent IDE support.</Description>
+        <PackageTags>mapper;mapping;source-generator;roslyn;automapper;mapster;mapperly;compile-time;performance</PackageTags>
+        <PackageProjectUrl>https://github.com/VPuzdriak/Mapgen</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/VPuzdriak/Mapgen</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Copyright>Copyright (c) 2026 Volodymyr Puzdriak</Copyright>
+        <!-- Source Generator specific settings -->
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <DevelopmentDependency>true</DevelopmentDependency>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <!-- Include the README in the package -->
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+
+    <!-- Pack the analyzer DLL in the correct location for source generators -->
+    <ItemGroup>
+        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+    </ItemGroup>
+
+</Project>

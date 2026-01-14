@@ -1,0 +1,85 @@
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+
+using Mapgen.Analyzer.Mapper.Metadata;
+using Mapgen.Analyzer.Mapper.Utils;
+
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace Mapgen.Analyzer.Mapper;
+
+public class MappingParser
+{
+  private readonly SemanticModel _semanticModel;
+
+  public MappingParser(SemanticModel semanticModel)
+  {
+    _semanticModel = semanticModel;
+  }
+
+  public List<IncludedMapperInfo> ParseIncludedMappers(
+    SyntaxNode classNode,
+    CancellationToken ct)
+  {
+    var includedMappers = new List<IncludedMapperInfo>();
+
+    if (classNode is not ClassDeclarationSyntax classDeclaration)
+    {
+      return includedMappers;
+    }
+
+    var constructor = SyntaxHelpers.FindConstructor(classDeclaration);
+    if (constructor?.Body is null)
+    {
+      return includedMappers;
+    }
+
+    // Find all IncludeMappers invocations
+    var includeMappersCall = constructor.Body.Statements
+      .OfType<ExpressionStatementSyntax>()
+      .Select(es => es.Expression)
+      .OfType<InvocationExpressionSyntax>()
+      .FirstOrDefault(inv =>
+        inv.Expression is IdentifierNameSyntax { Identifier.Text: Constants.IncludeMappersMethodName });
+
+    if (includeMappersCall is null)
+    {
+      return includedMappers;
+    }
+
+    // Get the argument (should be a collection expression)
+    if (includeMappersCall.ArgumentList.Arguments.Count != 1)
+    {
+      return includedMappers;
+    }
+
+    var argument = includeMappersCall.ArgumentList.Arguments[0].Expression;
+
+    // Handle collection expression: [new CarMapper(), new DriverMapper()]
+    if (argument is CollectionExpressionSyntax collectionExpression)
+    {
+      foreach (var element in collectionExpression.Elements)
+      {
+        if (ct.IsCancellationRequested)
+        {
+          break;
+        }
+
+        // Each element should be an ExpressionElementSyntax containing an ObjectCreationExpressionSyntax
+        if (element is ExpressionElementSyntax { Expression: ObjectCreationExpressionSyntax objectCreation })
+        {
+
+          var typeInfo = _semanticModel.GetTypeInfo(objectCreation, ct);
+          if (typeInfo.Type is INamedTypeSymbol mapperType)
+          {
+            includedMappers.Add(new IncludedMapperInfo(mapperType));
+          }
+        }
+      }
+    }
+
+    return includedMappers;
+  }
+}

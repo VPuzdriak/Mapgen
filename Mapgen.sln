@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{019DAD3D-FAE5-4A4F-8DBE-343235736946}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{417F707B-D6B8-48AE-A7A2-4EF151737823}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mapgen.Analyzer", "src\Mapgen.Analyzer\Mapgen.Analyzer.csproj", "{457CA979-F4FF-4811-80A6-9787FF5EC8A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mapgen.Tests.Unit", "tests\Mapgen.Tests.Unit\Mapgen.Tests.Unit.csproj", "{FE3E68DA-1E26-4B81-A147-B59F1A87F575}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mapgen.Sample.Console", "src\Mapgen.Sample.Console\Mapgen.Sample.Console.csproj", "{9CE6809E-8010-4844-9098-59BA7DD6295A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mapgen.Analyzer.Benchmarks", "src\Mapgen.Analyzer.Benchmarks\Mapgen.Analyzer.Benchmarks.csproj", "{AEB03B9F-B8F7-4DC1-82EF-E1DB02AFFFB1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{457CA979-F4FF-4811-80A6-9787FF5EC8A9} = {019DAD3D-FAE5-4A4F-8DBE-343235736946}
+		{FE3E68DA-1E26-4B81-A147-B59F1A87F575} = {417F707B-D6B8-48AE-A7A2-4EF151737823}
+		{9CE6809E-8010-4844-9098-59BA7DD6295A} = {019DAD3D-FAE5-4A4F-8DBE-343235736946}
+		{AEB03B9F-B8F7-4DC1-82EF-E1DB02AFFFB1} = {019DAD3D-FAE5-4A4F-8DBE-343235736946}
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{457CA979-F4FF-4811-80A6-9787FF5EC8A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{457CA979-F4FF-4811-80A6-9787FF5EC8A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{457CA979-F4FF-4811-80A6-9787FF5EC8A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{457CA979-F4FF-4811-80A6-9787FF5EC8A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE3E68DA-1E26-4B81-A147-B59F1A87F575}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE3E68DA-1E26-4B81-A147-B59F1A87F575}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE3E68DA-1E26-4B81-A147-B59F1A87F575}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE3E68DA-1E26-4B81-A147-B59F1A87F575}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CE6809E-8010-4844-9098-59BA7DD6295A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CE6809E-8010-4844-9098-59BA7DD6295A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CE6809E-8010-4844-9098-59BA7DD6295A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CE6809E-8010-4844-9098-59BA7DD6295A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AEB03B9F-B8F7-4DC1-82EF-E1DB02AFFFB1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AEB03B9F-B8F7-4DC1-82EF-E1DB02AFFFB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AEB03B9F-B8F7-4DC1-82EF-E1DB02AFFFB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AEB03B9F-B8F7-4DC1-82EF-E1DB02AFFFB1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

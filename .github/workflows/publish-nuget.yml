@@ -1,0 +1,30 @@
+name: Publish to NuGet
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+      
+      - name: Restore dependencies
+        run: dotnet restore src/Mapgen.Analyzer/Mapgen.Analyzer.csproj
+      
+      - name: Build
+        run: dotnet build src/Mapgen.Analyzer/Mapgen.Analyzer.csproj -c Release --no-restore
+      
+      - name: Pack
+        run: dotnet pack src/Mapgen.Analyzer/Mapgen.Analyzer.csproj -c Release -o nupkg --no-build
+      
+      - name: Push to NuGet
+        run: dotnet nuget push nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
