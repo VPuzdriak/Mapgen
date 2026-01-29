@@ -1,13 +1,10 @@
 ﻿namespace Mapgen.Analyzer.Mapper.MappingDescriptors
 {
-  public sealed class MappingDescriptor : BaseMappingDescriptor
+  public sealed class MappingDescriptor : SourceMappingDescriptor
   {
-    public string SourceExpression { get; }
-
     public MappingDescriptor(string targetPropertyName, string sourceExpression)
-      : base(targetPropertyName)
+      : base(targetPropertyName, sourceExpression)
     {
-      SourceExpression = sourceExpression;
     }
   }
 }

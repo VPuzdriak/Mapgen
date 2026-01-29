@@ -36,6 +36,9 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
     AddDirectMappings(methodMetadata, ct);
     AddUnmappedPropertyDiagnostics(methodMetadata, ct);
 
+    // Detect required usings
+    DetectRequiredUsings(methodMetadata);
+
     return methodMetadata;
   }
 
@@ -368,5 +371,17 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
     // Case 3: No public constructors (very rare, but handle it)
     // No diagnostic needed - other error will occur during generation
+  }
+
+  private static void DetectRequiredUsings(MapperMethodMetadata methodMetadata)
+  {
+    // Check if any mapping uses immutable collection methods
+    var usesImmutableCollections = methodMetadata.Mappings.OfType<SourceMappingDescriptor>()
+      .Any(m => m.SourceExpression.Contains(".ToImmutable"));
+
+    if (usesImmutableCollections)
+    {
+      methodMetadata.AddRequiredUsing("System.Collections.Immutable");
+    }
   }
 }

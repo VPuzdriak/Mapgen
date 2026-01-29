@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 using Mapgen.Analyzer.Mapper.MappingDescriptors;
@@ -41,7 +42,15 @@ public sealed class MapperTemplateEngine
   {
     var builder = new StringBuilder();
 
-    foreach (var ns in _configMetadata.Usings)
+    // Build list of required system namespaces
+    var requiredUsings = new List<string> { "System", "System.Collections.Generic", "System.Linq.Expressions" };
+
+    var allUsings = requiredUsings
+      .Concat(_configMetadata.Usings)
+      .Concat(_configMetadata.Method?.RequiredUsings ?? [])
+      .Distinct();
+
+    foreach (var ns in allUsings)
     {
       builder.AppendLine($"using {ns};");
     }
@@ -196,6 +205,7 @@ public sealed class MapperTemplateEngine
         var comma = i < constructorMappings.Count - 1 ? "," : "";
         builder.AppendLine($"        {mapping.SourceExpression}{comma}");
       }
+
       builder.Append("      )");
     }
     else
@@ -211,6 +221,7 @@ public sealed class MapperTemplateEngine
       {
         builder.AppendLine($"        {mapping.TargetPropertyName} = {mapping.SourceExpression},");
       }
+
       builder.Append("      }");
     }
 
@@ -290,12 +301,12 @@ public sealed class MapperTemplateEngine
       var parametersStr = string.Join(",\n      ", parameters.ToArray());
 
       var method = $$"""
-          private void UseConstructor(
-            {{parametersStr}})
-          {
-            // Mapgen will use this method for constructor configuration.
-          }
-      """;
+                         private void UseConstructor(
+                           {{parametersStr}})
+                         {
+                           // Mapgen will use this method for constructor configuration.
+                         }
+                     """;
 
       builder.Append(method);
     }
@@ -304,11 +315,11 @@ public sealed class MapperTemplateEngine
     if (constructorsWithParams.Count == 0)
     {
       builder.Append("""
-          private void UseConstructor()
-          {
-            // No parameterized constructors available.
-          }
-      """);
+                         private void UseConstructor()
+                         {
+                           // No parameterized constructors available.
+                         }
+                     """);
     }
 
     return builder.ToString();
@@ -486,11 +497,6 @@ public sealed class MapperTemplateEngine
 
   private const string MapperClassTemplate =
     """
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.Immutable;
-    using System.Linq.Expressions;
-
     {{Usings}}
 
     namespace {{Namespace}} {
