@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System;
+using System.Text.Json;
 
 using Mapgen.Sample.Console.Mappers;
 using Mapgen.Sample.Console.Models;

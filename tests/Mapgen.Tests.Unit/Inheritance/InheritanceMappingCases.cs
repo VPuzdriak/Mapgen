@@ -1,3 +1,5 @@
+using System;
+
 using FluentAssertions;
 
 using Mapgen.Tests.Unit.Inheritance.Models;

@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.PropertyAccessibility.Models;
 
 /// <summary>

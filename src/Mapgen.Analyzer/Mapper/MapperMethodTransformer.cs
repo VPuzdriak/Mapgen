@@ -375,13 +375,28 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
   private static void DetectRequiredUsings(MapperMethodMetadata methodMetadata)
   {
+    var sourceMappings = methodMetadata.Mappings.OfType<SourceMappingDescriptor>().ToList();
+
     // Check if any mapping uses immutable collection methods
-    var usesImmutableCollections = methodMetadata.Mappings.OfType<SourceMappingDescriptor>()
+    var usesImmutableCollections = sourceMappings
       .Any(m => m.SourceExpression.Contains(".ToImmutable"));
 
     if (usesImmutableCollections)
     {
       methodMetadata.AddRequiredUsing("System.Collections.Immutable");
+    }
+
+    // Check if any mapping uses LINQ methods (Select, Where, etc.)
+    var usesLinq = sourceMappings
+      .Any(m => m.SourceExpression.Contains(".Select(") ||
+                m.SourceExpression.Contains(".Where(") ||
+                m.SourceExpression.Contains(".ToList(") ||
+                m.SourceExpression.Contains(".ToArray(") ||
+                m.SourceExpression.Contains(".ToHashSet("));
+
+    if (usesLinq)
+    {
+      methodMetadata.AddRequiredUsing("System.Linq");
     }
   }
 }

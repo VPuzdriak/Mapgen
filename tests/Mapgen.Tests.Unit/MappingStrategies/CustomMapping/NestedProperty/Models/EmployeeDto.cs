@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.CustomMapping.NestedProperty.Models;
 
 public class EmployeeDto

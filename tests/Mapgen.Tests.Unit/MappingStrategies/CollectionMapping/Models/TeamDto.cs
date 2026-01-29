@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.CollectionMapping.Models;
 
 public class TeamDto

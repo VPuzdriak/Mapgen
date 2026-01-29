@@ -1,4 +1,6 @@
-﻿using FluentAssertions;
+﻿using System;
+
+using FluentAssertions;
 
 using Mapgen.Tests.Unit.MappingStrategies.CollectionMapping.Models;
 

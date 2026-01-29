@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.CollectionMapping.Models;
 
 public record MemberDto

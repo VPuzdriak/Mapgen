@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.Inheritance.Models;
 
 public sealed class CarDto : VehicleDto, IIdentifiable

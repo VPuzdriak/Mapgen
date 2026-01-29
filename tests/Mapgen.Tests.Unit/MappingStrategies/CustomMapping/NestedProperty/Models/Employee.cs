@@ -1,4 +1,6 @@
-﻿namespace Mapgen.Tests.Unit.MappingStrategies.CustomMapping.NestedProperty.Models;
+﻿using System;
+
+namespace Mapgen.Tests.Unit.MappingStrategies.CustomMapping.NestedProperty.Models;
 
 public class Employee
 {

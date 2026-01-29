@@ -1,3 +1,5 @@
+using System.Linq;
+
 using Mapgen.Analyzer;
 using Mapgen.Tests.Unit.MappingStrategies.CollectionMapping.Models;
 

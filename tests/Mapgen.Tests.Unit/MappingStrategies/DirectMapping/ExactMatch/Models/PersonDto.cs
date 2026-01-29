@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.DirectMapping.ExactMatch.Models;
 
 public class PersonDto
