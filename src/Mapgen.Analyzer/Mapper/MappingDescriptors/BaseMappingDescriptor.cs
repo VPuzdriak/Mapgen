@@ -9,3 +9,14 @@ public abstract class BaseMappingDescriptor
     TargetPropertyName = targetPropertyName;
   }
 }
+
+public abstract class SourceMappingDescriptor : BaseMappingDescriptor
+{
+  public string SourceExpression { get; }
+
+  protected SourceMappingDescriptor(string targetPropertyName, string sourceExpression)
+    : base(targetPropertyName)
+  {
+    SourceExpression = sourceExpression;
+  }
+}

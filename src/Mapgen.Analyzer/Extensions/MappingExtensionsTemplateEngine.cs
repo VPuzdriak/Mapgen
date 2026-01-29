@@ -36,7 +36,14 @@ public sealed class MappingExtensionsTemplateEngine
   {
     var builder = new StringBuilder();
 
-    foreach (var ns in _metadata.Usings)
+    // Ensure required system namespaces are always included
+    var requiredUsings = new[] { "System.Collections.Generic" };
+
+    var allUsings = requiredUsings
+      .Concat(_metadata.Usings)
+      .Distinct();
+
+    foreach (var ns in allUsings)
     {
       builder.AppendLine($"using {ns};");
     }
@@ -89,7 +96,6 @@ public sealed class MappingExtensionsTemplateEngine
 
   private const string MapperClassTemplate =
     """
-    using System.Collections.Generic;
 
     {{Usings}}
 

@@ -13,6 +13,7 @@ public sealed class MapperMethodMetadata
   private readonly List<BaseMappingDescriptor> _mappings = [];
   private readonly List<MapperDiagnostic> _diagnostics = [];
   private readonly List<IncludedMapperInfo> _includedMappers = [];
+  private readonly HashSet<string> _requiredUsings = [];
 
   public IMethodSymbol MethodSymbol { get; }
   public INamedTypeSymbol ReturnType => (INamedTypeSymbol)MethodSymbol.ReturnType;
@@ -31,6 +32,7 @@ public sealed class MapperMethodMetadata
   public IReadOnlyList<BaseMappingDescriptor> Mappings => _mappings;
   public IReadOnlyList<MapperDiagnostic> Diagnostics => _diagnostics;
   public IReadOnlyList<IncludedMapperInfo> IncludedMappers => _includedMappers;
+  public IReadOnlyCollection<string> RequiredUsings => _requiredUsings;
 
   public MapperMethodMetadata(IMethodSymbol methodSymbol)
   {
@@ -72,5 +74,10 @@ public sealed class MapperMethodMetadata
   public void SetUseEmptyConstructor(bool useEmptyConstructor)
   {
     UseEmptyConstructor = useEmptyConstructor;
+  }
+
+  public void AddRequiredUsing(string ns)
+  {
+    _requiredUsings.Add(ns);
   }
 }
