@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.Aliasing.Models.Entity;
 
 public class Person

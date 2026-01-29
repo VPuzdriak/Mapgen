@@ -1,3 +1,5 @@
+using System;
+
 using FluentAssertions;
 
 namespace Mapgen.Tests.Unit.Aliasing.Models;

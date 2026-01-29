@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.CustomMapping.MultipleParameters.Models;
 
 public class Shipment

@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.DirectMapping.ImplicitConversion.Models;
 
 public class Contact

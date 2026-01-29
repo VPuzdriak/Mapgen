@@ -1,3 +1,5 @@
+using System;
+
 namespace Mapgen.Tests.Unit.MappingStrategies.CustomMapping.SimpleExpression.Models;
 
 public class CustomerDto
