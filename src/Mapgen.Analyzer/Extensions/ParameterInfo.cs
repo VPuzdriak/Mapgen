@@ -4,12 +4,13 @@ namespace Mapgen.Analyzer.Extensions;
 
 public sealed class ParameterInfo
 {
-  public string Name { get; }
-  public ITypeSymbol TypeSymbol { get; }
+  public IParameterSymbol Symbol { get; }
+  public string TypeSyntax { get; }
+  public string Name => Symbol.Name;
 
-  public ParameterInfo(string name, ITypeSymbol typeSymbol)
+  public ParameterInfo(IParameterSymbol symbol, string typeSyntax)
   {
-    Name = name;
-    TypeSymbol = typeSymbol;
+    Symbol = symbol;
+    TypeSyntax = typeSyntax;
   }
 }

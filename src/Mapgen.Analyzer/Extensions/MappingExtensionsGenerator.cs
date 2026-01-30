@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -57,23 +56,12 @@ public class MappingExtensionsGenerator : IIncrementalGenerator
         break;
       }
 
-      if (!method.IsPartialDefinition)
+      if (!TryCreateMethodInfo(method, out ExtensionMethodInfo? methodInfo) || methodInfo is null)
       {
         continue;
       }
 
-      // Extract method info
-      var accessibility = method.DeclaredAccessibility;
-      var methodName = method.Name;
-      var returnTypeSymbol = method.ReturnType;
-      var parameters = method.Parameters.Select(p => new ParameterInfo(p.Name, p.Type)).ToList();
-
-      if (parameters.Count >= 1)
-      {
-        var extensionParameter = parameters[0];
-        var additionalParameters = parameters.Skip(1).ToList();
-        extensionMethods.Add(new ExtensionMethodInfo(accessibility, methodName, returnTypeSymbol, extensionParameter, additionalParameters));
-      }
+      extensionMethods.Add(methodInfo);
     }
 
     if (extensionMethods.Count == 0)
@@ -83,8 +71,33 @@ public class MappingExtensionsGenerator : IIncrementalGenerator
 
     // Extract using directives from the source file
     var usings = SyntaxHelpers.ExtractUsings(ctx.TargetNode);
-
     return new MapperExtensionsMetadata(usings, mapperNamespace, mapperClassAccessibility, mapperClassName, extensionMethods);
+  }
+
+  private bool TryCreateMethodInfo(IMethodSymbol method, out ExtensionMethodInfo? methodInfo)
+  {
+    if (!method.IsPartialDefinition)
+    {
+      methodInfo = null;
+      return false;
+    }
+
+    var methodSyntax = SyntaxHelpers.FindMethodDeclaration(method);
+
+    if (methodSyntax is null)
+    {
+      methodInfo = null;
+      return false;
+    }
+
+    if (method.Parameters.Length == 0)
+    {
+      methodInfo = null;
+      return false;
+    }
+
+    methodInfo = new ExtensionMethodInfo(method, methodSyntax);
+    return true;
   }
 
   private bool Predicate(SyntaxNode node, CancellationToken ct) => true;

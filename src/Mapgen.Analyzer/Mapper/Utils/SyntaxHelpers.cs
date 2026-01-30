@@ -72,4 +72,13 @@ internal static class SyntaxHelpers
 
     return usings;
   }
+
+  /// <summary>
+  /// Finds the method declaration syntax for a given method symbol.
+  /// </summary>
+  public static MethodDeclarationSyntax? FindMethodDeclaration(IMethodSymbol methodSymbol)
+  {
+    var syntaxReference = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+    return syntaxReference?.GetSyntax() as MethodDeclarationSyntax;
+  }
 }

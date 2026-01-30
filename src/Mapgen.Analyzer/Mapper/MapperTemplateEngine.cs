@@ -6,6 +6,8 @@ using Mapgen.Analyzer.Mapper.MappingDescriptors;
 using Mapgen.Analyzer.Mapper.Metadata;
 using Mapgen.Analyzer.Mapper.Utils;
 
+using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
+
 namespace Mapgen.Analyzer.Mapper;
 
 public sealed class MapperTemplateEngine
@@ -89,7 +91,7 @@ public sealed class MapperTemplateEngine
   {
     var accessibility = AccessibilityModifierHelpers.GetAccessibilityModifierString(methodMetadata.MethodAccessibility);
     var parameters = GenerateMethodParameters(methodMetadata);
-    var returnTypeName = _configMetadata.TypeAliasResolver.GetTypeDisplayString(methodMetadata.ReturnType);
+    var returnTypeName = methodMetadata.ReturnTypeSyntax;
 
     // Check if we need to use constructor with parameters
     if (methodMetadata.ConstructorInfo != null)
@@ -123,10 +125,10 @@ public sealed class MapperTemplateEngine
 
   private string GenerateMethodParameters(MapperMethodMetadata methodMetadata)
   {
-    // Use alias-aware type names for parameters
+    // Use alias-aware type names for parameters, preferring original syntax
     var parameters = methodMetadata.Parameters.Select(p =>
     {
-      var typeName = _configMetadata.TypeAliasResolver.GetTypeDisplayString(p.TypeSymbol);
+      var typeName = p.TypeSyntax;
       return $"{typeName} {p.Name}";
     });
     return string.Join(", ", parameters);
@@ -166,7 +168,7 @@ public sealed class MapperTemplateEngine
       return string.Empty;
     }
 
-    var returnTypeName = _configMetadata.TypeAliasResolver.GetTypeDisplayString(methodMetadata.ReturnType);
+    var returnTypeName = methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Get constructor parameter names (from the ConstructorInfo)
@@ -287,13 +289,12 @@ public sealed class MapperTemplateEngine
         builder.AppendLine().AppendLine();
       }
 
-      var sourceParamTypes = string.Join(", ", methodMetadata.Parameters.Select(p =>
-        _configMetadata.TypeAliasResolver.GetTypeDisplayString(p.TypeSymbol)));
+      var sourceParamTypes = string.Join(", ", methodMetadata.Parameters.Select(p => p.TypeSyntax));
 
-      var parameters = new System.Collections.Generic.List<string>();
+      var parameters = new List<string>();
       foreach (var ctorParam in constructor.Parameters)
       {
-        var paramType = _configMetadata.TypeAliasResolver.GetTypeDisplayString(ctorParam.Type);
+        var paramType = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         var paramName = ctorParam.Name;
         parameters.Add($"Expression<Func<{sourceParamTypes}, {paramType}>> {paramName}");
       }
@@ -337,7 +338,7 @@ public sealed class MapperTemplateEngine
 
   private string GenerateMapMemberMethod(MapperMethodMetadata methodMetadata)
   {
-    var destinationType = _configMetadata.TypeAliasResolver.GetTypeDisplayString(methodMetadata.ReturnType);
+    var destinationType = methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Generate overloads for 1 parameter up to the total number of parameters
@@ -354,8 +355,7 @@ public sealed class MapperTemplateEngine
       }
 
       var parameters = methodMetadata.Parameters.Take(paramCount).ToList();
-      var sourceParamTypes = string.Join(", ", parameters.Select(p =>
-        _configMetadata.TypeAliasResolver.GetTypeDisplayString(p.TypeSymbol)));
+      var sourceParamTypes = string.Join(", ", parameters.Select(p => p.TypeSyntax));
       var funcSignature = $"Func<{sourceParamTypes}, TDestinationMember>";
 
       var overload = $$"""
@@ -395,7 +395,7 @@ public sealed class MapperTemplateEngine
   {
     // Generates: MapCollection(dto => dto.Collection, item => item.ToDto())
     // Single property expression: destination collection
-    var destinationType = _configMetadata.TypeAliasResolver.GetTypeDisplayString(methodMetadata.ReturnType);
+    var destinationType = methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Base overload: item only
@@ -414,8 +414,7 @@ public sealed class MapperTemplateEngine
       builder.AppendLine().AppendLine();
 
       var parameters = methodMetadata.Parameters.Take(paramCount).ToList();
-      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p =>
-        _configMetadata.TypeAliasResolver.GetTypeDisplayString(p.TypeSymbol)));
+      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p => p.TypeSyntax));
       var funcSignature = $"Func<{string.Join(", ", paramTypes)}, TDestinationItem>";
 
       var overload = $$"""
@@ -436,7 +435,7 @@ public sealed class MapperTemplateEngine
   {
     // Generates: MapCollection(dto => dto.DtoCollection, source => source.SourceCollection, item => item.ToDto())
     // Two property expressions: destination collection + source collection
-    var destinationType = _configMetadata.TypeAliasResolver.GetTypeDisplayString(methodMetadata.ReturnType);
+    var destinationType = methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Only generate these if there are mapper parameters
@@ -446,7 +445,7 @@ public sealed class MapperTemplateEngine
     }
 
     var firstSourceParam = methodMetadata.Parameters.First();
-    var firstSourceParamType = _configMetadata.TypeAliasResolver.GetTypeDisplayString(firstSourceParam.TypeSymbol);
+    var firstSourceParamType = firstSourceParam.TypeSyntax;
 
     // Base overload: item only
     var baseOverload = $$"""
@@ -465,8 +464,7 @@ public sealed class MapperTemplateEngine
       builder.AppendLine().AppendLine();
 
       var parameters = methodMetadata.Parameters.Take(paramCount).ToList();
-      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p =>
-        _configMetadata.TypeAliasResolver.GetTypeDisplayString(p.TypeSymbol)));
+      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p => p.TypeSyntax));
       var funcSignature = $"Func<{string.Join(", ", paramTypes)}, TDestinationItem>";
 
       var overload = $$"""
@@ -486,7 +484,7 @@ public sealed class MapperTemplateEngine
 
   private string GenerateIgnoreMemberMethod(MapperMethodMetadata methodMetadata)
   {
-    var destinationType = _configMetadata.TypeAliasResolver.GetTypeDisplayString(methodMetadata.ReturnType);
+    var destinationType = methodMetadata.ReturnTypeSyntax;
     return $$"""
                  private void {{Constants.IgnoreMemberMethodName}}<TDestinationMember>(
                    Expression<Func<{{destinationType}}, TDestinationMember>> destinationMember) {
