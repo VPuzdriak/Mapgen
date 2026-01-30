@@ -2,8 +2,8 @@
 {
   public sealed class MappingDescriptor : SourceMappingDescriptor
   {
-    public MappingDescriptor(string targetPropertyName, string sourceExpression)
-      : base(targetPropertyName, sourceExpression)
+    public MappingDescriptor(string targetMemberName, string sourceExpression)
+      : base(targetMemberName, sourceExpression)
     {
     }
   }

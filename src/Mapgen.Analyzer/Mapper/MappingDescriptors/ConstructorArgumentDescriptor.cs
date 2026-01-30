@@ -8,10 +8,10 @@ public sealed class ConstructorArgumentDescriptor : SourceMappingDescriptor
   public int ParameterPosition { get; }
 
   public ConstructorArgumentDescriptor(
-    string targetPropertyName,
+    string targetMemberName,
     string sourceExpression,
     int parameterPosition)
-    : base(targetPropertyName, sourceExpression)
+    : base(targetMemberName, sourceExpression)
   {
     ParameterPosition = parameterPosition;
   }

@@ -14,38 +14,38 @@ namespace Mapgen.Analyzer.Mapper.Strategies;
 public sealed class DirectMappingStrategy(SemanticModel semanticModel)
 {
   public BaseMappingDescriptor TryCreateDirectMapping(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     MapperMethodMetadata methodMetadata)
   {
     // Check if types are compatible (exact match including nullable annotations or implicit conversion exists)
     var typesMatchIgnoringNullability =
-      SymbolEqualityComparer.Default.Equals(sourcePropertySymbol.Type, destPropertySymbol.Type);
-    var nullabilityMatches = sourcePropertySymbol.Type.NullableAnnotation == destPropertySymbol.Type.NullableAnnotation;
+      SymbolEqualityComparer.Default.Equals(sourceMember.Type, destMember.Type);
+    var nullabilityMatches = sourceMember.Type.NullableAnnotation == destMember.Type.NullableAnnotation;
     var typesMatch = typesMatchIgnoringNullability && nullabilityMatches;
 
     if (typesMatch)
     {
       // Exact match - create direct mapping
-      return CreateSuccessfulMapping(sourcePropertySymbol, destPropertySymbol, methodMetadata);
+      return CreateSuccessfulMapping(sourceMember, destMember, methodMetadata);
     }
 
     // Types don't match - check for special cases
-    if (IsNullableToNonNullableMismatch(sourcePropertySymbol, destPropertySymbol, typesMatchIgnoringNullability))
+    if (IsNullableToNonNullableMismatch(sourceMember, destMember, typesMatchIgnoringNullability))
     {
-      return CreateNullableMismatchDiagnostic(sourcePropertySymbol, destPropertySymbol, methodMetadata);
+      return CreateNullableMismatchDiagnostic(sourceMember, destMember, methodMetadata);
     }
 
     // Check if there's an implicit conversion from source to destination type (for different types like short -> int)
-    if (HasImplicitConversion(sourcePropertySymbol.Type, destPropertySymbol.Type))
+    if (HasImplicitConversion(sourceMember.Type, destMember.Type))
     {
-      return CreateSuccessfulMapping(sourcePropertySymbol, destPropertySymbol, methodMetadata);
+      return CreateSuccessfulMapping(sourceMember, destMember, methodMetadata);
     }
 
     // Check if both are collections with compatible element types
     var collectionMapping = TryCreateCollectionMappingWithCompatibleElements(
-      sourcePropertySymbol,
-      destPropertySymbol,
+      sourceMember,
+      destMember,
       methodMetadata);
     if (collectionMapping is not null)
     {
@@ -54,19 +54,19 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
 
     // Check if there's an included mapper that can map from source type to destination type
     var includedMapperMapping =
-      TryCreateMappingWithIncludedMapper(sourcePropertySymbol, destPropertySymbol, methodMetadata);
+      TryCreateMappingWithIncludedMapper(sourceMember, destMember, methodMetadata);
     if (includedMapperMapping is not null)
     {
       return includedMapperMapping;
     }
 
     // No valid mapping possible - report type mismatch
-    return CreateTypeMismatchDiagnostic(sourcePropertySymbol, destPropertySymbol, methodMetadata);
+    return CreateTypeMismatchDiagnostic(sourceMember, destMember, methodMetadata);
   }
 
   private bool IsNullableToNonNullableMismatch(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     bool typesMatchIgnoringNullability)
   {
     if (!typesMatchIgnoringNullability)
@@ -74,8 +74,8 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
       return false;
     }
 
-    var sourceIsNullable = sourcePropertySymbol.Type.NullableAnnotation == NullableAnnotation.Annotated;
-    var destIsNullable = destPropertySymbol.Type.NullableAnnotation == NullableAnnotation.Annotated;
+    var sourceIsNullable = sourceMember.Type.NullableAnnotation == NullableAnnotation.Annotated;
+    var destIsNullable = destMember.Type.NullableAnnotation == NullableAnnotation.Annotated;
 
     return sourceIsNullable && !destIsNullable;
   }
@@ -92,13 +92,13 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
   }
 
   private MappingDescriptor? TryCreateCollectionMappingWithCompatibleElements(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     MapperMethodMetadata methodMetadata)
   {
     // Extract element types if these are collection types
-    var sourceElementType = CollectionHelpers.GetCollectionElementType(sourcePropertySymbol.Type);
-    var destElementType = CollectionHelpers.GetCollectionElementType(destPropertySymbol.Type);
+    var sourceElementType = CollectionHelpers.GetCollectionElementType(sourceMember.Type);
+    var destElementType = CollectionHelpers.GetCollectionElementType(destMember.Type);
 
     // Both must be collections
     if (sourceElementType is null || destElementType is null)
@@ -117,7 +117,7 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
     }
 
     // Element types are compatible - generate collection mapping
-    var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourcePropertySymbol.Name}";
+    var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
     var itemParamName = CollectionHelpers.GetItemParameterName(sourceElementType);
 
     // When element types differ (even with implicit conversion), we need explicit cast
@@ -133,19 +133,19 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
       sourceExpression,
       itemParamName,
       itemTransformExpression,
-      destPropertySymbol.Type);
+      destMember.Type);
 
-    return new MappingDescriptor(destPropertySymbol.Name, mappingExpression);
+    return new MappingDescriptor(destMember.Name, mappingExpression);
   }
 
   private MappingDescriptor? TryCreateMappingWithIncludedMapper(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     MapperMethodMetadata methodMetadata)
   {
     // Extract element types if these are collection types
-    var sourceElementType = CollectionHelpers.GetCollectionElementType(sourcePropertySymbol.Type);
-    var destElementType = CollectionHelpers.GetCollectionElementType(destPropertySymbol.Type);
+    var sourceElementType = CollectionHelpers.GetCollectionElementType(sourceMember.Type);
+    var destElementType = CollectionHelpers.GetCollectionElementType(destMember.Type);
 
     // Check for collection/non-collection mismatch
     var sourceIsCollection = sourceElementType != null;
@@ -159,9 +159,9 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
 
     var isCollectionMapping = sourceIsCollection && destIsCollection;
 
-    // Use element types for collection mapping, otherwise use the property types directly
-    var sourceTypeToMatch = sourceElementType ?? sourcePropertySymbol.Type;
-    var destTypeToMatch = destElementType ?? destPropertySymbol.Type;
+    // Use element types for collection mapping, otherwise use the member types directly
+    var sourceTypeToMatch = sourceElementType ?? sourceMember.Type;
+    var destTypeToMatch = destElementType ?? destMember.Type;
 
     // Look through included mappers to find one that can map from source type to destination type
     foreach (var includedMapper in methodMetadata.IncludedMappers)
@@ -194,7 +194,7 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
         // Found a matching mapper method! Now build the mapping expression
         var mapperFieldName = includedMapper.FieldName;
         var methodName = mapperMethod.Name;
-        var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourcePropertySymbol.Name}";
+        var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
 
         if (isCollectionMapping)
         {
@@ -215,9 +215,9 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
             sourceExpression,
             itemParamName,
             itemTransformExpression,
-            destPropertySymbol.Type);
+            destMember.Type);
 
-          return new MappingDescriptor(destPropertySymbol.Name, mappingExpression);
+          return new MappingDescriptor(destMember.Name, mappingExpression);
         }
         else
         {
@@ -231,7 +231,7 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
           }
 
           var mappingExpression = $"{mapperFieldName}.{methodName}({string.Join(", ", methodParams)})";
-          return new MappingDescriptor(destPropertySymbol.Name, mappingExpression);
+          return new MappingDescriptor(destMember.Name, mappingExpression);
         }
       }
     }
@@ -241,47 +241,53 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
 
 
   private MappingDescriptor CreateSuccessfulMapping(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     MapperMethodMetadata methodMetadata)
   {
-    var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourcePropertySymbol.Name}";
-    return new MappingDescriptor(destPropertySymbol.Name, sourceExpression);
+    var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
+    return new MappingDescriptor(destMember.Name, sourceExpression);
   }
 
   private DiagnosedPropertyDescriptor CreateNullableMismatchDiagnostic(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     MapperMethodMetadata methodMetadata)
   {
+    var memberType = destMember.IsField ? "field" : "property";
+
     var diagnostic = MapperDiagnostic.NullableToNonNullableMismatch(
       methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
       methodMetadata.ReturnTypeName,
-      destPropertySymbol.Name,
-      destPropertySymbol.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+      destMember.Name,
+      destMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
       methodMetadata.SourceObjectParameter.Symbol.Type.Name,
-      sourcePropertySymbol.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-      Constants.MapMemberMethodName);
+      sourceMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+      Constants.MapMemberMethodName,
+      memberType);
 
     methodMetadata.AddDiagnostic(diagnostic);
-    return new DiagnosedPropertyDescriptor(destPropertySymbol.Name);
+    return new DiagnosedPropertyDescriptor(destMember.Name);
   }
 
   private DiagnosedPropertyDescriptor CreateTypeMismatchDiagnostic(
-    IPropertySymbol sourcePropertySymbol,
-    IPropertySymbol destPropertySymbol,
+    MemberInfo sourceMember,
+    MemberInfo destMember,
     MapperMethodMetadata methodMetadata)
   {
+    var memberType = destMember.IsField ? "field" : "property";
+
     var diagnostic = MapperDiagnostic.TypeMismatchInDirectMapping(
       methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
       methodMetadata.ReturnTypeName,
-      destPropertySymbol.Name,
-      destPropertySymbol.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+      destMember.Name,
+      destMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
       methodMetadata.SourceObjectParameter.Symbol.Type.Name,
-      sourcePropertySymbol.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-      Constants.MapMemberMethodName);
+      sourceMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+      Constants.MapMemberMethodName,
+      memberType);
 
     methodMetadata.AddDiagnostic(diagnostic);
-    return new DiagnosedPropertyDescriptor(destPropertySymbol.Name);
+    return new DiagnosedPropertyDescriptor(destMember.Name);
   }
 }

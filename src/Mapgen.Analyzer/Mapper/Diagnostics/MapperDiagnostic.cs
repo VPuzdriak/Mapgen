@@ -42,19 +42,20 @@ public sealed class MapperDiagnostic
   public static MapperDiagnostic MissingPropertyMapping(
     Location? location,
     string returnTypeName,
-    string propertyName,
+    string memberName,
     string sourceTypeName,
     string mapMemberMethodName,
-    string ignoreMemberMethodName)
+    string ignoreMemberMethodName,
+    string memberType)
   {
     return new MapperDiagnostic(
       id: DiagnosticIds.MissingPropertyMapping,
-      title: "Missing property mapping",
-      messageFormat: "{0} type has {1} property which does not exist in {2} type. Please, add custom mapping using {3}() or ignore this property explicitly using {4}().",
+      title: $"Missing {memberType} mapping",
+      messageFormat: $"{{0}} type has {{1}} {memberType} which does not exist in {{2}} type. Please, add custom mapping using {{3}}() or ignore this {memberType} explicitly using {{4}}().",
       severity: DiagnosticSeverity.Error,
       location: location,
       returnTypeName,
-      propertyName,
+      memberName,
       sourceTypeName,
       mapMemberMethodName,
       ignoreMemberMethodName);
@@ -78,47 +79,49 @@ public sealed class MapperDiagnostic
   public static MapperDiagnostic TypeMismatchInDirectMapping(
     Location? location,
     string destinationTypeName,
-    string propertyName,
-    string destinationPropertyType,
+    string memberName,
+    string destinationMemberType,
     string sourceTypeName,
-    string sourcePropertyType,
-    string mapMemberMethodName)
+    string sourceMemberType,
+    string mapMemberMethodName,
+    string memberTypeText)
   {
     return new MapperDiagnostic(
       id: DiagnosticIds.TypeMismatchInDirectMapping,
       title: "Type mismatch in direct mapping",
-      messageFormat: "Direct mapping cannot be used because property {0}.{1} is of type {2} and {3}.{1} is of type {4}. Use {5}() to create custom mapping.",
+      messageFormat: $"Direct mapping cannot be used because {memberTypeText} {{0}}.{{1}} is of type {{2}} and {{3}}.{{1}} is of type {{4}}. Use {{5}}() to create custom mapping.",
       severity: DiagnosticSeverity.Error,
       location: location,
       destinationTypeName,
-      propertyName,
-      destinationPropertyType,
+      memberName,
+      destinationMemberType,
       sourceTypeName,
-      sourcePropertyType,
+      sourceMemberType,
       mapMemberMethodName);
   }
 
   public static MapperDiagnostic NullableToNonNullableMismatch(
     Location? location,
     string destinationTypeName,
-    string propertyName,
-    string destinationPropertyType,
+    string memberName,
+    string destinationMemberType,
     string sourceTypeName,
-    string sourcePropertyType,
-    string mapMemberMethodName)
+    string sourceMemberType,
+    string mapMemberMethodName,
+    string memberTypeText)
   {
     return new MapperDiagnostic(
       id: DiagnosticIds.NullableToNonNullableMismatch,
       title: "Type mismatch in direct mapping",
       messageFormat:
-      "Direct mapping cannot be used because property {0}.{1} is of type {2} and {3}.{1} is of type {4}. This can cause NullReferenceException at runtime. Use {5}() to create custom mapping with explicit null handling.",
+      $"Direct mapping cannot be used because {memberTypeText} {{0}}.{{1}} is of type {{2}} and {{3}}.{{1}} is of type {{4}}. This can cause NullReferenceException at runtime. Use {{5}}() to create custom mapping with explicit null handling.",
       severity: DiagnosticSeverity.Error,
       location: location,
       destinationTypeName,
-      propertyName,
-      destinationPropertyType,
+      memberName,
+      destinationMemberType,
       sourceTypeName,
-      sourcePropertyType,
+      sourceMemberType,
       mapMemberMethodName);
   }
 

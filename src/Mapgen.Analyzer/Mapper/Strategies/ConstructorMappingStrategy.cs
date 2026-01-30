@@ -121,8 +121,8 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
   }
 
   /// <summary>
-  /// Checks if a constructor can be automatically mapped from source type properties.
-  /// A constructor is auto-mappable if all its parameters can be matched to source properties
+  /// Checks if a constructor can be automatically mapped from source type members (properties and fields).
+  /// A constructor is auto-mappable if all its parameters can be matched to source members
   /// by name (case-insensitive) and the types are compatible (same or implicitly convertible).
   /// </summary>
   /// <param name="constructor">The constructor to check.</param>
@@ -135,27 +135,27 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
       return false; // Parameterless constructors don't need auto-mapping
     }
 
-    var sourceProperties = sourceType.GetAllProperties().ToList();
+    var sourceMembers = sourceType.GetAllMembers().ToList();
 
     foreach (var parameter in constructor.Parameters)
     {
-      // Find source property by name (case-insensitive match)
-      var sourceProperty = sourceProperties.FirstOrDefault(p =>
-        string.Equals(p.Name, parameter.Name, StringComparison.OrdinalIgnoreCase));
+      // Find source member by name (case-insensitive match)
+      var sourceMember = sourceMembers.FirstOrDefault(m =>
+        string.Equals(m.Name, parameter.Name, StringComparison.OrdinalIgnoreCase));
 
-      if (sourceProperty == null)
+      if (sourceMember == null)
       {
-        return false; // No matching source property
+        return false; // No matching source member
       }
 
-      // Check if property is readable
-      if (!sourceProperty.IsReadable())
+      // Check if member is readable
+      if (!sourceMember.IsReadable())
       {
-        return false; // Source property can't be read
+        return false; // Source member can't be read
       }
 
       // Check type compatibility
-      if (!AreTypesCompatible(sourceProperty.Type, parameter.Type))
+      if (!AreTypesCompatible(sourceMember.Type, parameter.Type))
       {
         return false; // Types are not compatible
       }
