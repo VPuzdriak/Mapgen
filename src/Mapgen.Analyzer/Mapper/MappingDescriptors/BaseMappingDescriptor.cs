@@ -2,11 +2,11 @@
 
 public abstract class BaseMappingDescriptor
 {
-  public string TargetPropertyName { get; }
+  public string TargetMemberName { get; }
 
-  protected BaseMappingDescriptor(string targetPropertyName)
+  protected BaseMappingDescriptor(string targetMemberName)
   {
-    TargetPropertyName = targetPropertyName;
+    TargetMemberName = targetMemberName;
   }
 }
 
@@ -14,8 +14,8 @@ public abstract class SourceMappingDescriptor : BaseMappingDescriptor
 {
   public string SourceExpression { get; }
 
-  protected SourceMappingDescriptor(string targetPropertyName, string sourceExpression)
-    : base(targetPropertyName)
+  protected SourceMappingDescriptor(string targetMemberName, string sourceExpression)
+    : base(targetMemberName)
   {
     SourceExpression = sourceExpression;
   }

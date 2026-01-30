@@ -6,8 +6,8 @@ namespace Mapgen.Analyzer.Mapper.MappingDescriptors
   {
     public Location? IgnoreMemberMethodCallLocation { get; }
 
-    public IgnoredPropertyDescriptor(string targetPropertyName, Location? ignoreMemberMethodCallLocation)
-      : base(targetPropertyName)
+    public IgnoredPropertyDescriptor(string targetMemberName, Location? ignoreMemberMethodCallLocation)
+      : base(targetMemberName)
     {
       IgnoreMemberMethodCallLocation = ignoreMemberMethodCallLocation;
     }

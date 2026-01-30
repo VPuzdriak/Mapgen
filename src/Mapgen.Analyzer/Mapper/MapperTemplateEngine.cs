@@ -136,15 +136,15 @@ public sealed class MapperTemplateEngine
 
   private string GenerateMethodMappings(MapperMethodMetadata methodMetadata)
   {
-    // // Get all properties in declaration order to use as sorting reference
-    var propertyOrder = methodMetadata.ReturnType.GetAllProperties()
-      .Select((prop, index) => new { PropertyName = prop.Name, Order = index })
-      .ToDictionary(x => x.PropertyName, x => x.Order);
+    // Get all members (properties and fields) in declaration order to use as sorting reference
+    var memberOrder = methodMetadata.ReturnType.GetAllMembers()
+      .Select((member, index) => new { MemberName = member.Name, Order = index })
+      .ToDictionary(x => x.MemberName, x => x.Order);
 
-    // Sort mappings by the declaration order of destination properties
+    // Sort mappings by the declaration order of destination members
     var sortedMappings = methodMetadata.Mappings
       .OfType<MappingDescriptor>()
-      .OrderBy(m => propertyOrder.TryGetValue(m.TargetPropertyName, out var order) ? order : int.MaxValue);
+      .OrderBy(m => memberOrder.TryGetValue(m.TargetMemberName, out var order) ? order : int.MaxValue);
 
     var builder = new StringBuilder();
     foreach (var mapping in sortedMappings)
@@ -158,7 +158,7 @@ public sealed class MapperTemplateEngine
 
   private string GenerateMapping(MappingDescriptor mapping)
   {
-    return $"        {mapping.TargetPropertyName} = {mapping.SourceExpression},";
+    return $"        {mapping.TargetMemberName} = {mapping.SourceExpression},";
   }
 
   private string GenerateConstructorCall(MapperMethodMetadata methodMetadata)
@@ -185,13 +185,13 @@ public sealed class MapperTemplateEngine
     // Find mappings for properties that need object initializer (not constructor arguments)
     var initializerMappings = methodMetadata.Mappings
       .OfType<MappingDescriptor>()
-      .Where(m => !constructorParamNames.Contains(m.TargetPropertyName))
+      .Where(m => !constructorParamNames.Contains(m.TargetMemberName))
       .OrderBy(m =>
       {
-        var propertyOrder = methodMetadata.ReturnType.GetAllProperties()
-          .Select((prop, index) => new { PropertyName = prop.Name, Order = index })
-          .ToDictionary(x => x.PropertyName, x => x.Order);
-        return propertyOrder.TryGetValue(m.TargetPropertyName, out var order) ? order : int.MaxValue;
+        var memberOrder = methodMetadata.ReturnType.GetAllMembers()
+          .Select((member, index) => new { MemberName = member.Name, Order = index })
+          .ToDictionary(x => x.MemberName, x => x.Order);
+        return memberOrder.TryGetValue(m.TargetMemberName, out var order) ? order : int.MaxValue;
       })
       .ToList();
 
@@ -221,7 +221,7 @@ public sealed class MapperTemplateEngine
       builder.AppendLine(" {");
       foreach (var mapping in initializerMappings)
       {
-        builder.AppendLine($"        {mapping.TargetPropertyName} = {mapping.SourceExpression},");
+        builder.AppendLine($"        {mapping.TargetMemberName} = {mapping.SourceExpression},");
       }
 
       builder.Append("      }");

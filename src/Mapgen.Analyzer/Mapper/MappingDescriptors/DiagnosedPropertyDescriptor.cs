@@ -2,8 +2,8 @@
 {
   public sealed class DiagnosedPropertyDescriptor : BaseMappingDescriptor
   {
-    public DiagnosedPropertyDescriptor(string targetPropertyName)
-      : base(targetPropertyName)
+    public DiagnosedPropertyDescriptor(string targetMemberName)
+      : base(targetMemberName)
     {
     }
   }

@@ -27,8 +27,4 @@
         <ProjectReference Include="..\..\src\Mapgen.Analyzer\Mapgen.Analyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="FullNameTypes\Models\" />
-    </ItemGroup>
-
 </Project>

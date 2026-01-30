@@ -37,7 +37,7 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
     AddCustomMappings(classNode, methodMetadata, ct);
     AddCollectionMappings(classNode, methodMetadata, ct);
     AddDirectMappings(methodMetadata, ct);
-    AddUnmappedPropertyDiagnostics(methodMetadata, ct);
+    AddUnmappedMemberDiagnostics(methodMetadata, ct);
 
     // Detect required usings
     DetectRequiredUsings(methodMetadata);
@@ -71,14 +71,14 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
   }
 
   /// <summary>
-  /// Helper method to iterate through unmapped destination properties and apply an action.
+  /// Helper method to iterate through unmapped destination members (properties and fields) and apply an action.
   /// </summary>
-  private void ProcessUnmappedProperties(
+  private void ProcessUnmappedMembers(
     MapperMethodMetadata methodMetadata,
     CancellationToken ct,
-    Action<IPropertySymbol> action)
+    Action<MemberInfo> action)
   {
-    foreach (var destPropertySymbol in methodMetadata.ReturnType.GetAllProperties())
+    foreach (var destMember in methodMetadata.ReturnType.GetAllMembers())
     {
       if (ct.IsCancellationRequested)
       {
@@ -86,86 +86,75 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
       }
 
       // Skip if already mapped
-      if (methodMetadata.Mappings.Any(m => m.TargetPropertyName == destPropertySymbol.Name))
+      if (methodMetadata.Mappings.Any(m => m.TargetMemberName == destMember.Name))
       {
         continue;
       }
 
-      action(destPropertySymbol);
+      action(destMember);
     }
   }
 
   /// <summary>
-  /// Determines if a readonly property should be automatically ignored.
-  /// Properties without setters (readonly/computed properties) should always be ignored
+  /// Determines if a readonly member should be automatically ignored.
+  /// Members without setters (readonly/computed properties, readonly fields) should always be ignored
   /// since they cannot be set via object initializer. If they're constructor parameters,
   /// they'll already be in the mappings list and won't reach this check.
   /// </summary>
-  private static bool ShouldIgnoreReadonlyProperty(IPropertySymbol property)
+  private static bool ShouldIgnoreReadonlyMember(MemberInfo member)
   {
-    // Property without setter should always be ignored
-    // (computed properties, expression-bodied properties, get-only properties)
+    // Member without setter should always be ignored
+    // (computed properties, expression-bodied properties, get-only properties, readonly fields)
     // If it's a constructor parameter, it's already mapped and won't reach this method
-    return !property.IsSettable();
+    return !member.IsSettable();
   }
 
   private void AddIgnoreMappings(SyntaxNode classNode, MapperMethodMetadata methodMetadata, CancellationToken ct)
   {
     var ignoredPropertyMappings = _ignoreMappingStrategy.ParseIgnoreMappings(classNode, ct);
 
-    foreach (var destPropertySymbol in methodMetadata.ReturnType.GetAllProperties())
+    ProcessUnmappedMembers(methodMetadata, ct, destMember =>
     {
-      if (ct.IsCancellationRequested)
+      // Skip members that should be automatically ignored (system properties)
+      if (destMember.IsProperty && destMember.AsProperty()!.IsSystem())
       {
-        break;
+        methodMetadata.AddMapping(new IgnoredPropertyDescriptor(destMember.Name, null));
+        return;
       }
 
-      // Skip properties that are already mapped (e.g., by constructor)
-      if (methodMetadata.Mappings.Any(m => m.TargetPropertyName == destPropertySymbol.Name))
+      // Handle readonly members - only ignore if no constructor mapping configured
+      if (ShouldIgnoreReadonlyMember(destMember))
       {
-        continue;
+        methodMetadata.AddMapping(new IgnoredPropertyDescriptor(destMember.Name, null));
+        return;
       }
 
-      // Skip properties that should be automatically ignored
-      if (destPropertySymbol.IsSystem())
+      if (ignoredPropertyMappings.TryGetValue(destMember.Name, out var ignoredPropertyMapping))
       {
-        methodMetadata.AddMapping(new IgnoredPropertyDescriptor(destPropertySymbol.Name, null));
-        continue;
-      }
-
-      // Handle readonly properties - only ignore if no constructor mapping configured
-      if (ShouldIgnoreReadonlyProperty(destPropertySymbol))
-      {
-        methodMetadata.AddMapping(new IgnoredPropertyDescriptor(destPropertySymbol.Name, null));
-        continue;
-      }
-
-      if (ignoredPropertyMappings.TryGetValue(destPropertySymbol.Name, out var ignoredPropertyMapping))
-      {
-        // Check if the property has the 'required' keyword
-        if (destPropertySymbol.IsRequired)
+        // Check if the member is required (only properties can be required)
+        if (destMember.IsRequired())
         {
           var diagnostic = MapperDiagnostic.RequiredMemberCannotBeIgnored(
             ignoredPropertyMapping.IgnoreMemberMethodCallLocation,
-            destPropertySymbol.Name);
+            destMember.Name);
 
           methodMetadata.AddDiagnostic(diagnostic);
-          methodMetadata.AddMapping(new DiagnosedPropertyDescriptor(destPropertySymbol.Name));
-          continue;
+          methodMetadata.AddMapping(new DiagnosedPropertyDescriptor(destMember.Name));
+          return;
         }
 
         methodMetadata.AddMapping(ignoredPropertyMapping);
       }
-    }
+    });
   }
 
   private void AddCustomMappings(SyntaxNode classNode, MapperMethodMetadata methodMetadata, CancellationToken ct)
   {
     var customMappings = _customMappingStrategy.ParseCustomMappings(classNode, methodMetadata, ct);
 
-    ProcessUnmappedProperties(methodMetadata, ct, destPropertySymbol =>
+    ProcessUnmappedMembers(methodMetadata, ct, destMember =>
     {
-      if (customMappings.TryGetValue(destPropertySymbol.Name, out var customMapping))
+      if (customMappings.TryGetValue(destMember.Name, out var customMapping))
       {
         methodMetadata.AddMapping(customMapping);
       }
@@ -176,9 +165,9 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
   {
     var collectionMappings = _collectionMappingStrategy.ParseCollectionMappings(classNode, methodMetadata, ct);
 
-    ProcessUnmappedProperties(methodMetadata, ct, destPropertySymbol =>
+    ProcessUnmappedMembers(methodMetadata, ct, destMember =>
     {
-      if (collectionMappings.TryGetValue(destPropertySymbol.Name, out var collectionMapping))
+      if (collectionMappings.TryGetValue(destMember.Name, out var collectionMapping))
       {
         methodMetadata.AddMapping(collectionMapping);
       }
@@ -187,58 +176,64 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
   private void AddDirectMappings(MapperMethodMetadata methodMetadata, CancellationToken ct)
   {
-    ProcessUnmappedProperties(methodMetadata, ct, destPropertySymbol =>
+    ProcessUnmappedMembers(methodMetadata, ct, destMember =>
     {
-      var sourcePropertySymbol = (methodMetadata.SourceObjectParameter.Symbol.Type as INamedTypeSymbol)
-        ?.GetAllProperties()
-        .FirstOrDefault(sp => sp.Name == destPropertySymbol.Name);
-
-      // Make compiler happy here. We should always have a source property symbol
-      if (sourcePropertySymbol is null)
+      if (methodMetadata.SourceObjectParameter.Symbol.Type is not INamedTypeSymbol sourceType)
       {
         return;
       }
 
-      // Skip source properties without getters (write-only properties)
-      if (!sourcePropertySymbol.IsReadable())
+      // Look for matching source member by name (case-sensitive)
+      var sourceMember = sourceType.GetAllMembers()
+        .FirstOrDefault(sm => sm.Name == destMember.Name);
+
+      if (sourceMember is null)
       {
-        return; // Don't create mapping for unreadable source property
+        return;
       }
 
-      // Same property found by name - check if it's readable
-      var mapping = _directMappingStrategy.TryCreateDirectMapping(sourcePropertySymbol, destPropertySymbol, methodMetadata);
+      // Skip source members without read access (write-only properties, non-readable fields)
+      if (!sourceMember.IsReadable())
+      {
+        return; // Don't create mapping for unreadable source member
+      }
+
+      // Create direct mapping for matching members
+      var mapping = _directMappingStrategy.TryCreateDirectMapping(sourceMember, destMember, methodMetadata);
       methodMetadata.AddMapping(mapping);
     });
   }
 
-  private void AddUnmappedPropertyDiagnostics(MapperMethodMetadata methodMetadata, CancellationToken ct)
+  private void AddUnmappedMemberDiagnostics(MapperMethodMetadata methodMetadata, CancellationToken ct)
   {
     var returnType = methodMetadata.ReturnType;
     var sourceType = methodMetadata.SourceObjectParameter.Symbol.Type;
 
-    foreach (var destProperty in returnType.GetAllProperties())
+    foreach (var destMember in returnType.GetAllMembers())
     {
       if (ct.IsCancellationRequested)
       {
         break;
       }
 
-      // Check if property is mapped or ignored
-      var isMapped = methodMetadata.Mappings.Any(m => m.TargetPropertyName == destProperty.Name);
+      // Check if member is mapped or ignored
+      var isMapped = methodMetadata.Mappings.Any(m => m.TargetMemberName == destMember.Name);
 
       if (isMapped)
       {
         continue;
       }
 
-      // Property is not mapped and not ignored - create diagnostic
+      // Member is not mapped and not ignored - create diagnostic
+      var memberType = destMember.IsField ? "field" : "property";
       var diagnostic = MapperDiagnostic.MissingPropertyMapping(
         methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
         returnType.Name,
-        destProperty.Name,
+        destMember.Name,
         sourceType.Name,
         Constants.MapMemberMethodName,
-        Constants.IgnoreMemberMethodName);
+        Constants.IgnoreMemberMethodName,
+        memberType);
 
       methodMetadata.AddDiagnostic(diagnostic);
     }
@@ -342,16 +337,16 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
         // Create constructor argument mappings for each parameter
         foreach (var parameter in singleConstructor.Parameters)
         {
-          // Find matching source property (case-insensitive)
-          var sourceProperty = sourceType.GetAllProperties()
-            .FirstOrDefault(p => string.Equals(p.Name, parameter.Name, StringComparison.OrdinalIgnoreCase));
+          // Find matching source member (case-insensitive)
+          var sourceMember = sourceType.GetAllMembers()
+            .FirstOrDefault(m => string.Equals(m.Name, parameter.Name, StringComparison.OrdinalIgnoreCase));
 
-          if (sourceProperty == null)
+          if (sourceMember == null)
           {
             continue;
           }
 
-          var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceProperty.Name}";
+          var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
           var constructorArgMapping = new ConstructorArgumentDescriptor(
             parameter.Name,
             sourceExpression,
@@ -384,7 +379,6 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
         signatures);
 
       methodMetadata.AddDiagnostic(diagnostic);
-      return;
     }
 
     // Case 3: No public constructors (very rare, but handle it)
