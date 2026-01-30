@@ -65,15 +65,15 @@ public sealed class MappingExtensionsTemplateEngine
 
   private string GenerateExtensionMethod(ExtensionMethodInfo method)
   {
-    var returnType = _metadata.TypeAliasResolver.GetTypeDisplayString(method.ReturnTypeSymbol);
-    var sourceType = _metadata.TypeAliasResolver.GetTypeDisplayString(method.ExtensionParameter.TypeSymbol);
+    var returnType = method.ReturnTypeSyntax;
+    var sourceType = method.ExtensionParameter.TypeSyntax;
 
     var additionalParams = method.AdditionalParameters.Count > 0
       ? ", " + string.Join(", ", method.AdditionalParameters.Select(p =>
-        {
-          var paramType = _metadata.TypeAliasResolver.GetTypeDisplayString(p.TypeSymbol);
-          return $"{paramType} {p.Name}";
-        }))
+      {
+        var paramType = p.TypeSyntax;
+        return $"{paramType} {p.Name}";
+      }))
       : "";
 
     var additionalArgs = method.AdditionalParameters.Count > 0
@@ -91,7 +91,6 @@ public sealed class MappingExtensionsTemplateEngine
 
     return builder.ToString();
   }
-
 
 
   private const string MapperClassTemplate =

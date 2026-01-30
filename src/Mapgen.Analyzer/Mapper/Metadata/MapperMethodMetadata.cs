@@ -4,6 +4,7 @@ using Mapgen.Analyzer.Mapper.Diagnostics;
 using Mapgen.Analyzer.Mapper.MappingDescriptors;
 
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Mapgen.Analyzer.Mapper.Metadata;
 
@@ -16,6 +17,7 @@ public sealed class MapperMethodMetadata
   private readonly HashSet<string> _requiredUsings = [];
 
   public IMethodSymbol MethodSymbol { get; }
+  public string ReturnTypeSyntax { get; }
   public INamedTypeSymbol ReturnType => (INamedTypeSymbol)MethodSymbol.ReturnType;
   public string ReturnTypeName => MethodSymbol.ReturnType.Name;
   public string MethodName => MethodSymbol.Name;
@@ -34,21 +36,20 @@ public sealed class MapperMethodMetadata
   public IReadOnlyList<IncludedMapperInfo> IncludedMappers => _includedMappers;
   public IReadOnlyCollection<string> RequiredUsings => _requiredUsings;
 
-  public MapperMethodMetadata(IMethodSymbol methodSymbol)
+  public MapperMethodMetadata(IMethodSymbol methodSymbol, MethodDeclarationSyntax methodDeclarationSyntax)
   {
     MethodSymbol = methodSymbol;
+    ReturnTypeSyntax = methodDeclarationSyntax.ReturnType.ToString();
 
-    foreach (var parameter in methodSymbol.Parameters)
+    for (int i = 0; i < methodSymbol.Parameters.Length; i++)
     {
-      var parameterMetadata = new MapperMethodParameter(parameter);
-      AddParameter(parameterMetadata);
+      var parameter = methodSymbol.Parameters[i];
+
+      var originalTypeSyntax = methodDeclarationSyntax.ParameterList.Parameters[i].Type!.ToString();
+
+      var parameterMetadata = new MapperMethodParameter(parameter, originalTypeSyntax);
+      _parameters.Add(parameterMetadata);
     }
-  }
-
-
-  private void AddParameter(MapperMethodParameter parameter)
-  {
-    _parameters.Add(parameter);
   }
 
   public void AddMapping(BaseMappingDescriptor mapping)

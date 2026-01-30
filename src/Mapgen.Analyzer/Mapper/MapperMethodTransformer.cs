@@ -23,7 +23,10 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
   public MapperMethodMetadata? Transform(IMethodSymbol method, SyntaxNode classNode, CancellationToken ct)
   {
-    var methodMetadata = new MapperMethodMetadata(method);
+    if (!TryCreateMethodMetadata(method, out var methodMetadata) || methodMetadata is null)
+    {
+      return null;
+    }
 
     ParseIncludedMappers(classNode, methodMetadata, ct);
 
@@ -40,6 +43,21 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
     DetectRequiredUsings(methodMetadata);
 
     return methodMetadata;
+  }
+
+  private bool TryCreateMethodMetadata(IMethodSymbol methodSymbol, out MapperMethodMetadata? methodMetadata)
+  {
+    var methodDeclarationSyntax = SyntaxHelpers.FindMethodDeclaration(methodSymbol);
+
+    // Method declaration was not found - cannot proceed
+    if (methodDeclarationSyntax is null)
+    {
+      methodMetadata = null;
+      return false;
+    }
+
+    methodMetadata = new MapperMethodMetadata(methodSymbol, methodDeclarationSyntax);
+    return true;
   }
 
   private void ParseIncludedMappers(SyntaxNode classNode, MapperMethodMetadata methodMetadata, CancellationToken ct)

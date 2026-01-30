@@ -1,24 +1,33 @@
 ﻿using System.Collections.Generic;
 
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Mapgen.Analyzer.Extensions
 {
   public sealed class ExtensionMethodInfo
   {
-    public Accessibility Accessibility { get; private set; }
-    public string MethodName { get; }
-    public ITypeSymbol ReturnTypeSymbol { get; }
+    private readonly List<ParameterInfo> _additionalParameters = [];
+    public IMethodSymbol MethodSymbol { get; }
+    public string ReturnTypeSyntax { get; }
+    public Accessibility Accessibility => MethodSymbol.DeclaredAccessibility;
+    public string MethodName => MethodSymbol.Name;
     public ParameterInfo ExtensionParameter { get; }
-    public List<ParameterInfo> AdditionalParameters { get; }
+    public IReadOnlyList<ParameterInfo> AdditionalParameters => _additionalParameters;
 
-    public ExtensionMethodInfo(Accessibility accessibility, string methodName, ITypeSymbol returnTypeSymbol, ParameterInfo extensionParameter, List<ParameterInfo> additionalParameters)
+    public ExtensionMethodInfo(IMethodSymbol methodSymbol, MethodDeclarationSyntax methodDeclarationSyntax)
     {
-      Accessibility = accessibility;
-      MethodName = methodName;
-      ReturnTypeSymbol = returnTypeSymbol;
-      ExtensionParameter = extensionParameter;
-      AdditionalParameters = additionalParameters;
+      MethodSymbol = methodSymbol;
+      ReturnTypeSyntax = methodDeclarationSyntax.ReturnType.ToString();
+
+      var extensionParamSymbol = methodSymbol.Parameters[0];
+      ExtensionParameter = new ParameterInfo(extensionParamSymbol, methodDeclarationSyntax.ParameterList.Parameters[0].Type!.ToString());
+
+      for (int i = 1; i < methodSymbol.Parameters.Length; i++)
+      {
+        var additionalParamSymbol = methodSymbol.Parameters[i];
+        _additionalParameters.Add(new ParameterInfo(additionalParamSymbol, methodDeclarationSyntax.ParameterList.Parameters[i].Type!.ToString()));
+      }
     }
   }
 }

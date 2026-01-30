@@ -1,7 +1,5 @@
 using Mapgen.Analyzer.Benchmarks.Models;
 
-using Riok.Mapperly.Abstractions;
-
 namespace Mapgen.Analyzer.Benchmarks.Mappers.Mapperly;
 
 [Mapper]
