@@ -199,4 +199,16 @@ public sealed class MapperDiagnostic
       location: location,
       mapperClassName);
   }
+
+  public static MapperDiagnostic InvalidConstructorStatement(Location? location, string mapperClassName)
+  {
+    return new MapperDiagnostic(
+      id: DiagnosticIds.InvalidConstructorStatement,
+      title: "Invalid statement in mapper constructor",
+      messageFormat:
+      "Mapper class '{0}' constructor can only contain calls to mapping configuration methods. Variable declarations, branches, and other statements are not allowed.",
+      severity: DiagnosticSeverity.Error,
+      location: location,
+      mapperClassName);
+  }
 }

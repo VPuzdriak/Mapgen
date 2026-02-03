@@ -21,7 +21,7 @@ public sealed class IgnoreMappingStrategy : BaseMappingStrategy
     }
 
     // Find all IgnoreMember invocations
-    var ignoreMemberCalls = FindMethodInvocations(constructor, Constants.IgnoreMemberMethodName);
+    var ignoreMemberCalls = FindMethodInvocations(constructor, MappingConfigurationMethods.IgnoreMemberMethodName);
 
     foreach (var ignoreMemberCall in ignoreMemberCalls)
     {

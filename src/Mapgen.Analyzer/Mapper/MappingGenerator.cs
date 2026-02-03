@@ -61,7 +61,7 @@ namespace Mapgen.Analyzer.Mapper
       // Validate mapper constructor has no parameters
       ValidateMapperConstructor(ctx.TargetNode, mapperName, classDiagnostics);
 
-      
+
       var methodMetadata = TransformMappingMethod(ctx, mapperDeclaration, mapperName, classDiagnostics, ct);
       return new MappingConfigurationMetadata(usings, mapperNamespace, mapperName, mapperDeclaration.DeclaredAccessibility, methodMetadata, classDiagnostics);
     }
@@ -89,6 +89,47 @@ namespace Mapgen.Analyzer.Mapper
           mapperName);
 
         classDiagnostics.Add(diagnostic);
+      }
+
+      // Validate constructor body contains only allowed method calls
+      if (constructor.Body is not null)
+      {
+        var allowedMethods = new[]
+        {
+          MappingConfigurationMethods.MapMemberMethodName, MappingConfigurationMethods.MapCollectionMethodName, MappingConfigurationMethods.IgnoreMemberMethodName,
+          MappingConfigurationMethods.IncludeMappersMethodName, MappingConfigurationMethods.UseConstructorMethodName, MappingConfigurationMethods.UseEmptyConstructorMethodName
+        };
+
+        foreach (var statement in constructor.Body.Statements)
+        {
+          // if the statement is not a method call
+          if (statement is not ExpressionStatementSyntax { Expression: InvocationExpressionSyntax invocation })
+          {
+            var diagnostic = MapperDiagnostic.InvalidConstructorStatement(
+              statement.GetLocation(),
+              mapperName);
+
+            classDiagnostics.Add(diagnostic);
+            continue;
+          }
+
+          var methodName = invocation.Expression switch
+          {
+            IdentifierNameSyntax { Identifier.Text: var name } => name,
+            GenericNameSyntax { Identifier.Text: var genericName } => genericName,
+            _ => null
+          };
+
+          // if method name is not in allowed list
+          if (methodName is null || !allowedMethods.Contains(methodName))
+          {
+            var diagnostic = MapperDiagnostic.InvalidConstructorStatement(
+              statement.GetLocation(),
+              mapperName);
+
+            classDiagnostics.Add(diagnostic);
+          }
+        }
       }
     }
 

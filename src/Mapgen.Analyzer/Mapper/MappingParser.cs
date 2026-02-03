@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
@@ -42,7 +42,7 @@ public class MappingParser
       .Select(es => es.Expression)
       .OfType<InvocationExpressionSyntax>()
       .FirstOrDefault(inv =>
-        inv.Expression is IdentifierNameSyntax { Identifier.Text: Constants.IncludeMappersMethodName });
+        inv.Expression is IdentifierNameSyntax { Identifier.Text: MappingConfigurationMethods.IncludeMappersMethodName });
 
     if (includeMappersCall is null)
     {

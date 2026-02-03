@@ -34,7 +34,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
       return false;
     }
 
-    return FindMethodInvocations(constructor, Constants.UseConstructorMethodName).Any();
+    return FindMethodInvocations(constructor, MappingConfigurationMethods.UseConstructorMethodName).Any();
   }
 
   /// <summary>
@@ -48,7 +48,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
       return false;
     }
 
-    return FindMethodInvocations(constructor, Constants.UseEmptyConstructorMethodName).Any();
+    return FindMethodInvocations(constructor, MappingConfigurationMethods.UseEmptyConstructorMethodName).Any();
   }
 
   /// <summary>
@@ -62,7 +62,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
       return null;
     }
 
-    var useEmptyConstructorCall = FindMethodInvocations(constructor, Constants.UseEmptyConstructorMethodName)
+    var useEmptyConstructorCall = FindMethodInvocations(constructor, MappingConfigurationMethods.UseEmptyConstructorMethodName)
       .FirstOrDefault();
 
     return useEmptyConstructorCall?.GetLocation();
@@ -85,7 +85,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
     }
 
     // Find UseConstructor invocation
-    var useConstructorCall = FindMethodInvocations(constructor, Constants.UseConstructorMethodName)
+    var useConstructorCall = FindMethodInvocations(constructor, MappingConfigurationMethods.UseConstructorMethodName)
       .FirstOrDefault();
 
     if (useConstructorCall is null)

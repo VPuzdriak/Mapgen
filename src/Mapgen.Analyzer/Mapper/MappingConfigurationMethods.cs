@@ -1,6 +1,6 @@
 ﻿namespace Mapgen.Analyzer.Mapper
 {
-  public static class Constants
+  public static class MappingConfigurationMethods
   {
     public const string MapMemberMethodName = "MapMember";
     public const string MapCollectionMethodName = "MapCollection";

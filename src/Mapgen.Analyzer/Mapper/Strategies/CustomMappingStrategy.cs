@@ -25,7 +25,7 @@ public sealed class CustomMappingStrategy : BaseMappingStrategy
     }
 
     // Find all MapMember invocations
-    var mapMemberCalls = FindMethodInvocations(constructor, Constants.MapMemberMethodName);
+    var mapMemberCalls = FindMethodInvocations(constructor, MappingConfigurationMethods.MapMemberMethodName);
 
     foreach (var mapMemberCall in mapMemberCalls)
     {
@@ -56,7 +56,7 @@ public sealed class CustomMappingStrategy : BaseMappingStrategy
       if (!ValidateLambdaExpressionBody(
         sourceArg,
         destPropertyName,
-        Constants.MapMemberMethodName,
+        MappingConfigurationMethods.MapMemberMethodName,
         mapMemberCall.GetLocation(),
         methodMetadata))
       {

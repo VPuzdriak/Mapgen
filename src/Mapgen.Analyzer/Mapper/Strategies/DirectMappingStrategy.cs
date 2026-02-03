@@ -263,7 +263,7 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
       destMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
       methodMetadata.SourceObjectParameter.Symbol.Type.Name,
       sourceMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-      Constants.MapMemberMethodName,
+      MappingConfigurationMethods.MapMemberMethodName,
       memberType);
 
     methodMetadata.AddDiagnostic(diagnostic);
@@ -284,7 +284,7 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
       destMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
       methodMetadata.SourceObjectParameter.Symbol.Type.Name,
       sourceMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-      Constants.MapMemberMethodName,
+      MappingConfigurationMethods.MapMemberMethodName,
       memberType);
 
     methodMetadata.AddDiagnostic(diagnostic);
