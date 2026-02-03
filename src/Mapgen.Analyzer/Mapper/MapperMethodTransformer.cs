@@ -231,8 +231,8 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
         returnType.Name,
         destMember.Name,
         sourceType.Name,
-        Constants.MapMemberMethodName,
-        Constants.IgnoreMemberMethodName,
+        MappingConfigurationMethods.MapMemberMethodName,
+        MappingConfigurationMethods.IgnoreMemberMethodName,
         memberType);
 
       methodMetadata.AddDiagnostic(diagnostic);

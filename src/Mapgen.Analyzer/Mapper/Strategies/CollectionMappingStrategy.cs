@@ -27,7 +27,7 @@ public sealed class CollectionMappingStrategy : BaseMappingStrategy
     }
 
     // Find all MapCollection invocations (both generic and non-generic)
-    var mapCollectionCalls = FindMethodInvocations(constructor, Constants.MapCollectionMethodName);
+    var mapCollectionCalls = FindMethodInvocations(constructor, MappingConfigurationMethods.MapCollectionMethodName);
 
     foreach (var mapCollectionCall in mapCollectionCalls)
     {
@@ -74,7 +74,7 @@ public sealed class CollectionMappingStrategy : BaseMappingStrategy
       if (!ValidateLambdaExpressionBody(
         itemTransformArg,
         destProperty.Name,
-        Constants.MapCollectionMethodName,
+        MappingConfigurationMethods.MapCollectionMethodName,
         mapCollectionCall.GetLocation(),
         methodMetadata))
       {

@@ -359,7 +359,7 @@ public sealed class MapperTemplateEngine
       var funcSignature = $"Func<{sourceParamTypes}, TDestinationMember>";
 
       var overload = $$"""
-                           private void {{Constants.MapMemberMethodName}}<TDestinationMember>(
+                           private void {{MappingConfigurationMethods.MapMemberMethodName}}<TDestinationMember>(
                              Expression<Func<{{destinationType}}, TDestinationMember>> destinationMember,
                              {{funcSignature}} sourceFunc) {
                              // Mapgen will use this method as mapping configuration.
@@ -486,7 +486,7 @@ public sealed class MapperTemplateEngine
   {
     var destinationType = methodMetadata.ReturnTypeSyntax;
     return $$"""
-                 private void {{Constants.IgnoreMemberMethodName}}<TDestinationMember>(
+                 private void {{MappingConfigurationMethods.IgnoreMemberMethodName}}<TDestinationMember>(
                    Expression<Func<{{destinationType}}, TDestinationMember>> destinationMember) {
                    // Mapgen will use this method as mapping configuration.
                  }

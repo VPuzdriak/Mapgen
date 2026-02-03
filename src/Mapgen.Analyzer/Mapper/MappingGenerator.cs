@@ -8,6 +8,7 @@ using Mapgen.Analyzer.Mapper.Metadata;
 using Mapgen.Analyzer.Mapper.Utils;
 
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Mapgen.Analyzer.Mapper
@@ -56,20 +57,89 @@ namespace Mapgen.Analyzer.Mapper
       // Extract using directives from the source file
       var usings = SyntaxHelpers.ExtractUsings(ctx.TargetNode);
 
-      var classDiagnostics = TryTransformMappingMethod(ctx, ct, mapperDeclaration, mapperName, out var methodMetadata);
+      var classDiagnostics = new List<MapperDiagnostic>();
+      // Validate mapper constructor has no parameters
+      ValidateMapperConstructor(ctx.TargetNode, mapperName, classDiagnostics);
 
+
+      var methodMetadata = TransformMappingMethod(ctx, mapperDeclaration, mapperName, classDiagnostics, ct);
       return new MappingConfigurationMetadata(usings, mapperNamespace, mapperName, mapperDeclaration.DeclaredAccessibility, methodMetadata, classDiagnostics);
     }
 
+    private static void ValidateMapperConstructor(SyntaxNode classNode, string mapperName, List<MapperDiagnostic> classDiagnostics)
+    {
+      if (classNode is not ClassDeclarationSyntax classDeclaration)
+      {
+        return;
+      }
 
-    private static List<MapperDiagnostic> TryTransformMappingMethod(
+      var constructor = SyntaxHelpers.FindConstructor(classDeclaration);
+
+      // If no constructor, it's fine (will use default parameterless constructor)
+      if (constructor is null)
+      {
+        return;
+      }
+
+      // Check if constructor has parameters
+      if (constructor.ParameterList.Parameters.Count > 0)
+      {
+        var diagnostic = MapperDiagnostic.MapperConstructorWithParameters(
+          constructor.ParameterList.GetLocation(),
+          mapperName);
+
+        classDiagnostics.Add(diagnostic);
+      }
+
+      // Validate constructor body contains only allowed method calls
+      if (constructor.Body is not null)
+      {
+        var allowedMethods = new[]
+        {
+          MappingConfigurationMethods.MapMemberMethodName, MappingConfigurationMethods.MapCollectionMethodName, MappingConfigurationMethods.IgnoreMemberMethodName,
+          MappingConfigurationMethods.IncludeMappersMethodName, MappingConfigurationMethods.UseConstructorMethodName, MappingConfigurationMethods.UseEmptyConstructorMethodName
+        };
+
+        foreach (var statement in constructor.Body.Statements)
+        {
+          // if the statement is not a method call
+          if (statement is not ExpressionStatementSyntax { Expression: InvocationExpressionSyntax invocation })
+          {
+            var diagnostic = MapperDiagnostic.InvalidConstructorStatement(
+              statement.GetLocation(),
+              mapperName);
+
+            classDiagnostics.Add(diagnostic);
+            continue;
+          }
+
+          var methodName = invocation.Expression switch
+          {
+            IdentifierNameSyntax { Identifier.Text: var name } => name,
+            GenericNameSyntax { Identifier.Text: var genericName } => genericName,
+            _ => null
+          };
+
+          // if method name is not in allowed list
+          if (methodName is null || !allowedMethods.Contains(methodName))
+          {
+            var diagnostic = MapperDiagnostic.InvalidConstructorStatement(
+              statement.GetLocation(),
+              mapperName);
+
+            classDiagnostics.Add(diagnostic);
+          }
+        }
+      }
+    }
+
+    private static MapperMethodMetadata? TransformMappingMethod(
       GeneratorAttributeSyntaxContext ctx,
-      CancellationToken ct,
       INamedTypeSymbol mapperDeclaration,
       string mapperName,
-      out MapperMethodMetadata? methodMetadata)
+      List<MapperDiagnostic> classDiagnostics,
+      CancellationToken ct)
     {
-      var classDiagnostics = new List<MapperDiagnostic>();
       var partialMethods = mapperDeclaration.GetMembers()
         .OfType<IMethodSymbol>()
         .Where(m => m.IsPartialDefinition)
@@ -90,16 +160,14 @@ namespace Mapgen.Analyzer.Mapper
         }
       }
 
-      // Only process the first partial method
-      methodMetadata = null;
       if (partialMethods.Count > 0 && !ct.IsCancellationRequested)
       {
         var firstMethod = partialMethods[0];
         var methodTransformer = new MapperMethodTransformer(ctx.SemanticModel);
-        methodMetadata = methodTransformer.Transform(firstMethod, ctx.TargetNode, ct);
+        return methodTransformer.Transform(firstMethod, ctx.TargetNode, ct);
       }
 
-      return classDiagnostics;
+      return null;
     }
 
     private bool Predicate(SyntaxNode node, CancellationToken ct) => true;

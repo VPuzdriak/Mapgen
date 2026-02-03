@@ -42,7 +42,7 @@ public class MappingParser
       .Select(es => es.Expression)
       .OfType<InvocationExpressionSyntax>()
       .FirstOrDefault(inv =>
-        inv.Expression is IdentifierNameSyntax { Identifier.Text: Constants.IncludeMappersMethodName });
+        inv.Expression is IdentifierNameSyntax { Identifier.Text: MappingConfigurationMethods.IncludeMappersMethodName });
 
     if (includeMappersCall is null)
     {
@@ -70,16 +70,57 @@ public class MappingParser
         // Each element should be an ExpressionElementSyntax containing an ObjectCreationExpressionSyntax
         if (element is ExpressionElementSyntax { Expression: ObjectCreationExpressionSyntax objectCreation })
         {
-
-          var typeInfo = _semanticModel.GetTypeInfo(objectCreation, ct);
-          if (typeInfo.Type is INamedTypeSymbol mapperType)
-          {
-            includedMappers.Add(new IncludedMapperInfo(mapperType));
-          }
+          TryAddMapperFromCreationExpression(objectCreation, includedMappers, ct);
         }
       }
     }
+    // Handle array creation expressions: new object[] { ... }
+    else if (argument is ArrayCreationExpressionSyntax arrayCreation)
+    {
+      ExtractMappersFromInitializer(arrayCreation.Initializer, includedMappers, ct);
+    }
+    // Handle implicit array creation: new[] { ... }
+    else if (argument is ImplicitArrayCreationExpressionSyntax implicitArrayCreation)
+    {
+      ExtractMappersFromInitializer(implicitArrayCreation.Initializer, includedMappers, ct);
+    }
 
     return includedMappers;
+  }
+
+  private void ExtractMappersFromInitializer(
+    InitializerExpressionSyntax? initializer,
+    List<IncludedMapperInfo> includedMappers,
+    CancellationToken ct)
+  {
+    if (initializer is null)
+    {
+      return;
+    }
+
+    foreach (var expression in initializer.Expressions)
+    {
+      if (ct.IsCancellationRequested)
+      {
+        break;
+      }
+
+      if (expression is ObjectCreationExpressionSyntax objectCreation)
+      {
+        TryAddMapperFromCreationExpression(objectCreation, includedMappers, ct);
+      }
+    }
+  }
+
+  private void TryAddMapperFromCreationExpression(
+    ObjectCreationExpressionSyntax objectCreation,
+    List<IncludedMapperInfo> includedMappers,
+    CancellationToken ct)
+  {
+    var typeInfo = _semanticModel.GetTypeInfo(objectCreation, ct);
+    if (typeInfo.Type is INamedTypeSymbol mapperType)
+    {
+      includedMappers.Add(new IncludedMapperInfo(mapperType));
+    }
   }
 }

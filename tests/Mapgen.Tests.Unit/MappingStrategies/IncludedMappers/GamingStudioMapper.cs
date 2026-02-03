@@ -10,8 +10,6 @@ public partial class GamingStudioMapper
 
   public GamingStudioMapper()
   {
-    IncludeMappers([
-      new PublisherMapper()
-    ]);
+    IncludeMappers([new PublisherMapper()]);
   }
 }
