@@ -14,6 +14,7 @@ internal static class DiagnosticIds
   public const string ParameterizedConstructorRequired = "MAPPER007";
   public const string AmbiguousConstructorSelection = "MAPPER008";
   public const string UseEmptyConstructorNotPossible = "MAPPER009";
+  public const string MapperConstructorWithParameters = "MAPPER010";
 
   public const string Category = "Mapper";
 }

@@ -185,4 +185,18 @@ public sealed class MapperDiagnostic
       destinationType,
       constructorSignatures);
   }
+
+  public static MapperDiagnostic MapperConstructorWithParameters(
+    Location? location,
+    string mapperClassName)
+  {
+    return new MapperDiagnostic(
+      id: DiagnosticIds.MapperConstructorWithParameters,
+      title: "Mapper constructor cannot have parameters",
+      messageFormat:
+      "Mapper class '{0}' constructor cannot have parameters. Mapper constructors should be parameterless and only contain configuration method calls",
+      severity: DiagnosticSeverity.Error,
+      location: location,
+      mapperClassName);
+  }
 }
