@@ -55,7 +55,6 @@ public sealed class CustomMappingStrategy : BaseMappingStrategy
       // Validate lambda expression body (blocks not supported)
       if (!ValidateLambdaExpressionBody(
         sourceArg,
-        destPropertyName,
         MappingConfigurationMethods.MapMemberMethodName,
         mapMemberCall.GetLocation(),
         methodMetadata))

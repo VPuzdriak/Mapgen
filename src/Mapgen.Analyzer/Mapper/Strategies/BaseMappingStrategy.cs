@@ -21,7 +21,7 @@ public abstract class BaseMappingStrategy
   /// </summary>
   /// <param name="classNode">The class syntax node to search.</param>
   /// <returns>The constructor declaration, or null if not found.</returns>
-  protected static ConstructorDeclarationSyntax? GetMapperConstructor(Microsoft.CodeAnalysis.SyntaxNode classNode)
+  protected static ConstructorDeclarationSyntax? GetMapperConstructor(SyntaxNode classNode)
   {
     if (classNode is not ClassDeclarationSyntax classDeclaration)
     {
@@ -73,14 +73,12 @@ public abstract class BaseMappingStrategy
   /// Lambda blocks are not supported and will generate a diagnostic.
   /// </summary>
   /// <param name="expression">The expression to validate.</param>
-  /// <param name="propertyName">The destination property name (for diagnostic).</param>
   /// <param name="methodName">The method name where this lambda is used (for diagnostic).</param>
   /// <param name="location">The location of the method call (for diagnostic).</param>
   /// <param name="methodMetadata">The mapper method metadata to add diagnostics to.</param>
   /// <returns>True if validation passes (expression body), false if validation fails (block body).</returns>
   protected static bool ValidateLambdaExpressionBody(
     ExpressionSyntax expression,
-    string propertyName,
     string methodName,
     Location location,
     MapperMethodMetadata methodMetadata)
@@ -91,7 +89,6 @@ public abstract class BaseMappingStrategy
     {
       var diagnostic = MapperDiagnostic.LambdaBlockNotSupported(
         location,
-        propertyName,
         methodName);
       methodMetadata.AddDiagnostic(diagnostic);
       return false;

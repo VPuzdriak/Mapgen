@@ -73,7 +73,6 @@ public sealed class CollectionMappingStrategy : BaseMappingStrategy
       // Validate lambda expression body (blocks not supported)
       if (!ValidateLambdaExpressionBody(
         itemTransformArg,
-        destProperty.Name,
         MappingConfigurationMethods.MapCollectionMethodName,
         mapCollectionCall.GetLocation(),
         methodMetadata))
