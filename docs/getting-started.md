@@ -14,9 +14,10 @@ Or manually edit your `.csproj` file:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.0.0" 
-                      OutputItemType="Analyzer" 
-                      ReferenceOutputAssembly="false"/>
+    <PackageReference Include="Mapgen.Analyzer" Version="1.0.1">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
 </ItemGroup>
 ```
 
@@ -46,7 +47,7 @@ public class UserDto
 ### Step 3: Create a Mapper
 
 ```csharp
-using Mapgen.Analyzer.Abstractions;
+using Mapgen.Analyzer;
 
 [Mapper]
 public partial class UserMapper

@@ -1,9 +1,10 @@
-﻿﻿﻿# Advanced Usage
+﻿# Advanced Usage
 
 This guide covers advanced Mapgen features and patterns for complex mapping scenarios.
 
 ## Table of Contents
 - [Constructor Mapping](#constructor-mapping)
+- [Mapper Constructor Validation](#mapper-constructor-validation)
 - [Mapper Composition](#mapper-composition)
 - [Complex Collection Scenarios](#complex-collection-scenarios)
 - [Multi-Parameter Mapping](#multi-parameter-mapping)
@@ -951,6 +952,229 @@ public partial class CarMapper
   }
 }
 ```
+
+## Mapper Constructor Validation
+
+Mapgen enforces strict validation rules for mapper constructors to ensure clean, maintainable mapper definitions and prevent common configuration mistakes.
+
+### Constructor Rules
+
+**Mapper constructors must:**
+- ✅ Only contain mapping configuration method calls
+- ✅ Not have any parameters
+- ✅ Not contain arbitrary expressions or statements
+
+**Allowed configuration methods:**
+- `MapMember()` - Custom property mapping
+- `MapCollection()` - Custom collection mapping
+- `IgnoreMember()` - Ignore specific properties
+- `UseConstructor()` - Configure constructor parameters
+- `UseEmptyConstructor()` - Use parameterless constructor
+- `IncludeMappers()` - Include other mappers
+
+### MAPPER010: Constructor Parameters Not Allowed
+
+**When it occurs:** Mapper constructor contains parameters.
+
+```csharp
+// ❌ ERROR: Mapper constructor cannot have parameters
+[Mapper]
+public partial class PersonMapper
+{
+    public partial PersonDto ToDto(Person source);
+
+    // ❌ MAPPER010: Constructor cannot have parameters
+    public PersonMapper(ILogger logger)
+    {
+        MapMember(dto => dto.FullName, 
+                  person => $"{person.FirstName} {person.LastName}");
+    }
+}
+```
+
+**Why this rule exists:**
+- Mappers are designed to be stateless and reusable
+- Parameters would complicate the auto-generated extension methods
+- Dependencies should be handled through dependency injection at a higher level, not in mappers
+
+**Fix:**
+```csharp
+// ✅ Correct: No parameters
+[Mapper]
+public partial class PersonMapper
+{
+    public partial PersonDto ToDto(Person source);
+
+    public PersonMapper()
+    {
+        MapMember(dto => dto.FullName, 
+                  person => $"{person.FirstName} {person.LastName}");
+    }
+}
+```
+
+**Alternative approach for dependencies:**
+```csharp
+// If you need to inject dependencies, use a wrapper class
+public class PersonMappingService
+{
+    private readonly ILogger _logger;
+    private readonly PersonMapper _mapper;
+
+    public PersonMappingService(ILogger logger)
+    {
+        _logger = logger;
+        _mapper = new PersonMapper();
+    }
+
+    public PersonDto MapToDto(Person person)
+    {
+        _logger.LogInformation("Mapping person {Id}", person.Id);
+        return _mapper.ToDto(person);
+    }
+}
+```
+
+### MAPPER011: Invalid Constructor statement
+
+**When it occurs:** Mapper constructor contains expressions or statements other than mapping configuration method calls.
+
+```csharp
+// ❌ ERROR: Constructor contains non-configuration expressions
+[Mapper]
+public partial class ProductMapper
+{
+    public partial ProductDto ToDto(Product source);
+
+    public ProductMapper()
+    {
+        // ❌ MAPPER011: Variable declarations not allowed
+        var defaultCategory = "Uncategorized";
+        
+        // ❌ MAPPER011: Arbitrary expressions not allowed
+        Console.WriteLine("Initializing mapper");
+        
+        // ✅ This is allowed - it's a configuration method
+        MapMember(dto => dto.Category, 
+                  product => product.Category ?? "Uncategorized");
+    }
+}
+```
+
+**Fix:**
+```csharp
+// ✅ Correct: Only configuration method calls
+[Mapper]
+public partial class ProductMapper
+{
+    public partial ProductDto ToDto(Product source);
+
+    public ProductMapper()
+    {
+        // All configuration inline - no variables or arbitrary code
+        MapMember(dto => dto.Category, 
+                  product => product.Category ?? "Uncategorized");
+        
+        IgnoreMember(dto => dto.InternalId);
+        
+        UseEmptyConstructor();
+    }
+}
+```
+
+**Common violations and fixes:**
+
+**❌ Variable declarations:**
+```csharp
+public ProductMapper()
+{
+    var defaultValue = "N/A";  // ❌ Not allowed
+    MapMember(dto => dto.Name, p => p.Name ?? defaultValue);
+}
+```
+
+**✅ Use inline values:**
+```csharp
+public ProductMapper()
+{
+    MapMember(dto => dto.Name, p => p.Name ?? "N/A");  // ✅ Correct
+}
+```
+
+**❌ Conditional statements:**
+```csharp
+public ProductMapper()
+{
+    if (someCondition)  // ❌ Not allowed
+    {
+        MapMember(dto => dto.Name, p => p.Name);
+    }
+}
+```
+
+**✅ Use configuration methods directly:**
+```csharp
+public ProductMapper()
+{
+    MapMember(dto => dto.Name, p => p.Name);  // ✅ Always configure
+}
+```
+
+**❌ Method calls to non-configuration methods:**
+```csharp
+public ProductMapper()
+{
+    InitializeDefaults();  // ❌ Not allowed
+    MapMember(dto => dto.Name, p => p.Name);
+}
+```
+
+**✅ Only use configuration methods:**
+```csharp
+public ProductMapper()
+{
+    MapMember(dto => dto.Name, p => p.Name);  // ✅ Correct
+    IgnoreMember(dto => dto.InternalId);      // ✅ Correct
+}
+```
+
+All three approaches are equivalent and generate the same code. Use whichever style you prefer.
+
+### Why These Rules Matter
+
+**Before (v1.0.1):** Invalid constructor content was silently ignored, leading to confusion:
+```csharp
+public ProductMapper(ILogger logger)  // Silently ignored - no error!
+{
+    var defaultValue = "N/A";  // Ignored
+    // Generated code cannot access defaultValue.
+    MapMember(dto => dto.Name, p => p.Name ?? defaultName);
+}
+```
+
+**After (v1.0.1):** Clear diagnostics help you identify issues immediately:
+```csharp
+public ProductMapper(ILogger logger)  // ❌ MAPPER010: Clear error!
+{
+    var defaultValue = "N/A";  // ❌ MAPPER011: Clear error!
+    MapMember(dto => dto.Name, p => p.Name ?? "N/A");  // ✅ Works
+}
+```
+
+**Benefits:**
+- 🎯 **Clear feedback** - Know immediately when something is wrong
+- 🧹 **Cleaner code** - Enforces best practices
+- 📖 **Better maintainability** - Mappers are easier to understand
+- 🐛 **Fewer bugs** - Catch configuration errors at compile time
+
+### Summary
+
+| Rule | Error Code | Description |
+|------|------------|-------------|
+| No parameters | MAPPER010  | Constructor cannot have parameters |
+| Configuration only | MAPPER011  | Only mapping configuration methods allowed |
+
+**Remember:** These validations only affect mapper constructors, not the mapping methods themselves. Your mapping logic can be as complex as needed using `MapMember()` expressions.
 
 ## Mapper Composition
 
