@@ -30,16 +30,13 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
     ParseIncludedMappers(classNode, methodMetadata, ct);
 
-    // Analyze constructors before property mappings
-    AnalyzeConstructors(classNode, methodMetadata, ct);
-
+    AddConstructorArgumentsMappings(classNode, methodMetadata, ct);
     AddIgnoreMappings(classNode, methodMetadata, ct);
     AddCustomMappings(classNode, methodMetadata, ct);
     AddCollectionMappings(classNode, methodMetadata, ct);
     AddDirectMappings(methodMetadata, ct);
     AddUnmappedMemberDiagnostics(methodMetadata, ct);
 
-    // Detect required usings
     DetectRequiredUsings(methodMetadata);
 
     return methodMetadata;
@@ -93,6 +90,27 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
       action(destMember);
     }
+  }
+
+  /// <summary>
+  /// Tries to get the source type from the method metadata.
+  /// </summary>
+  private static bool TryGetSourceType(MapperMethodMetadata methodMetadata, out INamedTypeSymbol? sourceType)
+  {
+    sourceType = methodMetadata.SourceObjectParameter.Symbol.Type as INamedTypeSymbol;
+    return sourceType is not null;
+  }
+
+  /// <summary>
+  /// Finds a matching source member by name with the specified comparison type.
+  /// </summary>
+  private static MemberInfo? FindMatchingSourceMember(
+    INamedTypeSymbol sourceType,
+    string memberName,
+    StringComparison comparison = StringComparison.Ordinal)
+  {
+    return sourceType.GetAllMembers()
+      .FirstOrDefault(m => string.Equals(m.Name, memberName, comparison));
   }
 
   /// <summary>
@@ -176,16 +194,15 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
   private void AddDirectMappings(MapperMethodMetadata methodMetadata, CancellationToken ct)
   {
+    if (!TryGetSourceType(methodMetadata, out var sourceType) || sourceType is null)
+    {
+      return;
+    }
+
     ProcessUnmappedMembers(methodMetadata, ct, destMember =>
     {
-      if (methodMetadata.SourceObjectParameter.Symbol.Type is not INamedTypeSymbol sourceType)
-      {
-        return;
-      }
-
       // Look for matching source member by name (case-sensitive)
-      var sourceMember = sourceType.GetAllMembers()
-        .FirstOrDefault(sm => sm.Name == destMember.Name);
+      var sourceMember = FindMatchingSourceMember(sourceType, destMember.Name);
 
       if (sourceMember is null)
       {
@@ -239,7 +256,7 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
     }
   }
 
-  private void AnalyzeConstructors(SyntaxNode classNode, MapperMethodMetadata methodMetadata, CancellationToken ct)
+  private void AddConstructorArgumentsMappings(SyntaxNode classNode, MapperMethodMetadata methodMetadata, CancellationToken ct)
   {
     var destinationType = methodMetadata.ReturnType;
 
@@ -261,107 +278,47 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
     // If user specified UseEmptyConstructor, validate it's possible
     if (hasUseEmptyConstructorCall)
     {
-      var parameterlessConstructor = publicConstructors.FirstOrDefault(c => c.Parameters.Length == 0);
-
-      if (parameterlessConstructor == null)
-      {
-        // ERROR: UseEmptyConstructor called but no parameterless constructor exists
-        var signatures = ConstructorMappingStrategy.GetConstructorSignatures(destinationType);
-        var callLocation = _constructorMappingStrategy.GetUseEmptyConstructorCallLocation(classNode);
-        var diagnostic = MapperDiagnostic.UseEmptyConstructorNotPossible(
-          callLocation ?? methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
-          destinationType.Name,
-          signatures);
-
-        methodMetadata.AddDiagnostic(diagnostic);
-        return;
-      }
-
-      // Valid: UseEmptyConstructor and parameterless constructor exists
-      methodMetadata.SetUseEmptyConstructor(true);
+      HandleUseEmptyConstructorCall(classNode, methodMetadata, publicConstructors);
       return;
     }
 
     // If user specified UseConstructor, parse it
     if (hasUseConstructorCall)
     {
-      var constructorArgs = _constructorMappingStrategy.ParseConstructorArguments(classNode, methodMetadata, ct);
-      var selectedConstructor = _constructorMappingStrategy.SelectConstructorByParameterCount(destinationType, constructorArgs.Count);
-
-      if (selectedConstructor != null)
-      {
-        var constructorInfo = new ConstructorInfo(selectedConstructor);
-        methodMetadata.SetConstructorInfo(constructorInfo);
-
-        // Create constructor argument mappings
-        for (var i = 0; i < constructorArgs.Count && i < selectedConstructor.Parameters.Length; i++)
-        {
-          var parameter = selectedConstructor.Parameters[i];
-          var sourceExpression = constructorArgs[i];
-
-          var constructorArgMapping = new ConstructorArgumentDescriptor(
-            parameter.Name,
-            sourceExpression,
-            i);
-
-          methodMetadata.AddMapping(constructorArgMapping);
-        }
-      }
-
+      HandleUseConstructorCall(classNode, methodMetadata, ct);
       return;
     }
 
     // No explicit constructor configuration - analyze and apply auto-mapping if possible
-
     var totalConstructorCount = publicConstructors.Count;
 
-    // Case 1: Exactly 1 constructor - try to auto-use it
     if (totalConstructorCount == 1)
     {
-      var singleConstructor = publicConstructors[0];
+      HandleSingleConstructor(methodMetadata, publicConstructors[0]);
+      return;
+    }
 
-      // If it's parameterless, no need to do anything (will use it automatically)
-      if (singleConstructor.Parameters.Length == 0)
-      {
-        return;
-      }
+    if (totalConstructorCount > 1)
+    {
+      HandleMultipleConstructors(methodMetadata);
+    }
+  }
 
-      // If it's parameterized, try to auto-map
-      if (methodMetadata.SourceObjectParameter.Symbol.Type is INamedTypeSymbol sourceType &&
-          _constructorMappingStrategy.CanAutoMapConstructor(singleConstructor, sourceType))
-      {
-        // Auto-map the constructor
-        var constructorInfo = new ConstructorInfo(singleConstructor);
-        methodMetadata.SetConstructorInfo(constructorInfo);
+  private void HandleUseEmptyConstructorCall(
+    SyntaxNode classNode,
+    MapperMethodMetadata methodMetadata,
+    System.Collections.Generic.List<IMethodSymbol> publicConstructors)
+  {
+    var destinationType = methodMetadata.ReturnType;
+    var parameterlessConstructor = publicConstructors.FirstOrDefault(c => c.Parameters.Length == 0);
 
-        // Create constructor argument mappings for each parameter
-        foreach (var parameter in singleConstructor.Parameters)
-        {
-          // Find matching source member (case-insensitive)
-          var sourceMember = sourceType.GetAllMembers()
-            .FirstOrDefault(m => string.Equals(m.Name, parameter.Name, StringComparison.OrdinalIgnoreCase));
-
-          if (sourceMember == null)
-          {
-            continue;
-          }
-
-          var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
-          var constructorArgMapping = new ConstructorArgumentDescriptor(
-            parameter.Name,
-            sourceExpression,
-            parameter.Ordinal);
-
-          methodMetadata.AddMapping(constructorArgMapping);
-        }
-
-        return; // Successfully auto-mapped
-      }
-
-      // Can't auto-map single parameterized constructor - show diagnostic
+    if (parameterlessConstructor == null)
+    {
+      // ERROR: UseEmptyConstructor called but no parameterless constructor exists
       var signatures = ConstructorMappingStrategy.GetConstructorSignatures(destinationType);
-      var diagnostic = MapperDiagnostic.ParameterizedConstructorRequired(
-        methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
+      var callLocation = _constructorMappingStrategy.GetUseEmptyConstructorCallLocation(classNode);
+      var diagnostic = MapperDiagnostic.UseEmptyConstructorNotPossible(
+        callLocation ?? methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
         destinationType.Name,
         signatures);
 
@@ -369,21 +326,107 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
       return;
     }
 
-    // Case 2: Multiple constructors (2+) - ERROR: ambiguous, must specify which to use
-    if (totalConstructorCount > 1)
+    // Valid: UseEmptyConstructor and parameterless constructor exists
+    methodMetadata.SetUseEmptyConstructor(true);
+  }
+
+  private void HandleUseConstructorCall(
+    SyntaxNode classNode,
+    MapperMethodMetadata methodMetadata,
+    CancellationToken ct)
+  {
+    var destinationType = methodMetadata.ReturnType;
+    var constructorArgs = _constructorMappingStrategy.ParseConstructorArguments(classNode, methodMetadata, ct);
+    var selectedConstructor = _constructorMappingStrategy.SelectConstructorByParameterCount(destinationType, constructorArgs.Count);
+
+    if (selectedConstructor == null)
     {
-      var signatures = ConstructorMappingStrategy.GetConstructorSignatures(destinationType);
-      var diagnostic = MapperDiagnostic.AmbiguousConstructorSelection(
+      return;
+    }
+
+    var constructorInfo = new ConstructorInfo(selectedConstructor);
+    methodMetadata.SetConstructorInfo(constructorInfo);
+
+    // Create constructor argument mappings
+    for (var i = 0; i < constructorArgs.Count && i < selectedConstructor.Parameters.Length; i++)
+    {
+      var parameter = selectedConstructor.Parameters[i];
+      var sourceExpression = constructorArgs[i];
+
+      var constructorArgMapping = new ConstructorArgumentDescriptor(
+        parameter.Name,
+        sourceExpression,
+        i);
+
+      methodMetadata.AddMapping(constructorArgMapping);
+    }
+  }
+
+  private void HandleSingleConstructor(MapperMethodMetadata methodMetadata, IMethodSymbol singleConstructor)
+  {
+    // If it's parameterless, no need to do anything (will use it automatically)
+    if (singleConstructor.Parameters.Length == 0)
+    {
+      return;
+    }
+
+    // If it's parameterized, try to auto-map
+    if (!TryGetSourceType(methodMetadata, out var sourceType) || sourceType is null ||
+        !_constructorMappingStrategy.CanAutoMapConstructor(singleConstructor, sourceType, methodMetadata))
+    {
+      // Can't auto-map single parameterized constructor - show diagnostic
+      var signatures = ConstructorMappingStrategy.GetConstructorSignatures(methodMetadata.ReturnType);
+      var diagnostic = MapperDiagnostic.ParameterizedConstructorRequired(
         methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
-        destinationType.Name,
+        methodMetadata.ReturnType.Name,
         signatures);
 
       methodMetadata.AddDiagnostic(diagnostic);
+      return;
     }
 
-    // Case 3: No public constructors (very rare, but handle it)
-    // No diagnostic needed - other error will occur during generation
+    // Auto-map the constructor
+    var constructorInfo = new ConstructorInfo(singleConstructor);
+    methodMetadata.SetConstructorInfo(constructorInfo);
+
+    // Create constructor argument mappings for each parameter
+    foreach (var parameter in singleConstructor.Parameters)
+    {
+      // Find matching source member (case-insensitive)
+      var sourceMember = FindMatchingSourceMember(sourceType, parameter.Name, StringComparison.OrdinalIgnoreCase);
+
+      if (sourceMember == null)
+      {
+        continue;
+      }
+
+      // Build the source expression using included mapper if needed
+      var sourceExpression = _constructorMappingStrategy.BuildConstructorArgumentExpression(
+        sourceMember,
+        parameter.Type,
+        methodMetadata);
+
+      var constructorArgMapping = new ConstructorArgumentDescriptor(
+        parameter.Name,
+        sourceExpression,
+        parameter.Ordinal);
+
+      methodMetadata.AddMapping(constructorArgMapping);
+    }
   }
+
+  private void HandleMultipleConstructors(MapperMethodMetadata methodMetadata)
+  {
+    // Multiple constructors (2+) - ERROR: ambiguous, must specify which to use
+    var signatures = ConstructorMappingStrategy.GetConstructorSignatures(methodMetadata.ReturnType);
+    var diagnostic = MapperDiagnostic.AmbiguousConstructorSelection(
+      methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
+      methodMetadata.ReturnType.Name,
+      signatures);
+
+    methodMetadata.AddDiagnostic(diagnostic);
+  }
+
 
   private static void DetectRequiredUsings(MapperMethodMetadata methodMetadata)
   {

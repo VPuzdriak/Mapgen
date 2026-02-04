@@ -32,12 +32,12 @@ public abstract class BaseMappingStrategy
   }
 
   /// <summary>
-  /// Finds all invocations of a specific method within the mapper constructor.
+  /// Gets all invocations of a specific configuration method within the mapper constructor body.
   /// </summary>
   /// <param name="constructor">The constructor to search.</param>
-  /// <param name="methodName">The name of the method to find (e.g., "MapMember", "UseConstructor").</param>
+  /// <param name="methodName">The name of the configuration method to find (e.g., "MapMember", "UseConstructor").</param>
   /// <returns>Collection of invocation expressions matching the method name.</returns>
-  protected static IEnumerable<InvocationExpressionSyntax> FindMethodInvocations(
+  protected static IEnumerable<InvocationExpressionSyntax> GetConfigurationMethodCalls(
     ConstructorDeclarationSyntax? constructor,
     string methodName)
   {
