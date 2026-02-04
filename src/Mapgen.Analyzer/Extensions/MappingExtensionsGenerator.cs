@@ -71,7 +71,11 @@ public class MappingExtensionsGenerator : IIncrementalGenerator
 
     // Extract using directives from the source file
     var usings = SyntaxHelpers.ExtractUsings(ctx.TargetNode);
-    return new MapperExtensionsMetadata(usings, mapperNamespace, mapperClassAccessibility, mapperClassName, extensionMethods);
+
+    // Detect nullable context
+    var nullableEnabled = SyntaxHelpers.IsNullableEnabled(ctx.TargetNode, ctx.SemanticModel);
+
+    return new MapperExtensionsMetadata(usings, mapperNamespace, mapperClassAccessibility, mapperClassName, extensionMethods, nullableEnabled);
   }
 
   private bool TryCreateMethodInfo(IMethodSymbol method, out ExtensionMethodInfo? methodInfo)

@@ -81,4 +81,40 @@ internal static class SyntaxHelpers
     var syntaxReference = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
     return syntaxReference?.GetSyntax() as MethodDeclarationSyntax;
   }
+
+  /// <summary>
+  /// Determines if nullable reference types are enabled in the context of the given syntax node.
+  /// Checks both project-level settings and file-level #nullable directives.
+  /// </summary>
+  public static bool IsNullableEnabled(SyntaxNode node, SemanticModel semanticModel)
+  {
+    // Navigate up to find the compilation unit (root of the syntax tree)
+    var compilationUnit = node.AncestorsAndSelf()
+      .OfType<CompilationUnitSyntax>()
+      .FirstOrDefault();
+
+    if (compilationUnit is null)
+    {
+      return false;
+    }
+
+    // Check for #nullable enable directive at the file level
+    var hasNullableEnableDirective = compilationUnit.DescendantTrivia()
+      .Any(trivia => trivia.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.NullableDirectiveTrivia) &&
+                     trivia.ToString().Contains("enable"));
+
+    if (hasNullableEnableDirective)
+    {
+      return true;
+    }
+
+    // Check compilation options
+    var compilation = semanticModel.Compilation;
+    if (compilation.Options is Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions csharpOptions)
+    {
+      return csharpOptions.NullableContextOptions == NullableContextOptions.Enable;
+    }
+
+    return false;
+  }
 }
