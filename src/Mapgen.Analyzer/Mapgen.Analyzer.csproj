@@ -9,7 +9,7 @@
         
         <!-- NuGet Package Metadata -->
         <PackageId>Mapgen.Analyzer</PackageId>
-        <Version>1.0.1</Version>
+        <Version>1.1.0</Version>
         <Authors>Volodymyr Puzdriak</Authors>
         <Company>Volodymyr Puzdriak</Company>
         <Description>A high-performance, compile-time object mapper for .NET using source generators. Mapgen generates all mapping code at compile time, providing zero runtime overhead, full type safety, and excellent IDE support.</Description>
