@@ -1,12 +1,14 @@
-﻿﻿# Core Features
+﻿# Core Features
 
 ## Table of Contents
 - [Automatic Property Mapping](#automatic-property-mapping)
+- [Field Mapping](#field-mapping)
 - [Custom Property Mapping](#custom-property-mapping)
 - [Multiple Parameters](#multiple-parameters)
 - [Collection Mapping](#collection-mapping)
 - [Nested Object Mapping](#nested-object-mapping)
 - [Ignoring Properties](#ignoring-properties)
+- [Fully Qualified Type Names](#fully-qualified-type-names)
 - [Extension Methods](#extension-methods)
 
 ## Automatic Property Mapping
@@ -55,6 +57,115 @@ public class Destination
     public long Number { get; set; }
     public double Value { get; set; }
     public string? Text { get; set; }
+}
+```
+
+## Field Mapping
+
+Mapgen supports mapping public fields in addition to properties. This is particularly useful when working with DTOs, data structures, or legacy code that uses fields.
+
+### Automatic Field Mapping
+
+Fields are automatically mapped when:
+- Field names match exactly (case-sensitive)
+- Types are the same or implicitly convertible
+- Fields are public and accessible
+
+```csharp
+public class Person
+{
+    public string FirstName;  // Public field
+    public string LastName;   // Public field
+    public int Age;          // Public field
+}
+
+public class PersonDto
+{
+    public string FirstName { get; set; }  // Property
+    public string LastName { get; set; }   // Property
+    public int Age { get; set; }          // Property
+}
+
+[Mapper]
+public partial class PersonMapper
+{
+    public partial PersonDto ToDto(Person source);
+    // Fields automatically mapped to properties!
+}
+```
+
+### Mixed Fields and Properties
+
+Mapgen seamlessly handles classes with both fields and properties:
+
+```csharp
+public class Product
+{
+    public int Id { get; set; }      // Property
+    public string Name;              // Field
+    public decimal Price;            // Field
+    public string Category { get; set; }  // Property
+}
+
+public class ProductDto
+{
+    public int Id;                   // Field
+    public string Name { get; set; } // Property
+    public decimal Price { get; set; } // Property
+    public string Category;          // Field
+}
+
+[Mapper]
+public partial class ProductMapper
+{
+    public partial ProductDto ToDto(Product source);
+    // All fields and properties automatically mapped!
+}
+```
+
+### Field Access Considerations
+
+**Important:** Only public fields are supported for mapping. Private, protected, or internal fields are ignored:
+
+```csharp
+public class Account
+{
+    public string Id;           // ✅ Mapped - public
+    private string password;    // ❌ Ignored - private
+    protected string token;     // ❌ Ignored - protected
+    internal string key;        // ❌ Ignored - internal
+}
+```
+
+### Readonly Fields
+
+Readonly fields can be mapped through constructor parameters:
+
+```csharp
+public class ImmutablePerson
+{
+    public readonly string Name;  // Readonly field
+    public readonly int Age;      // Readonly field
+
+    public ImmutablePerson(string name, int age)
+    {
+        Name = name;
+        Age = age;
+    }
+}
+
+[Mapper]
+public partial class PersonMapper
+{
+    public partial ImmutablePerson ToImmutable(Person source);
+
+    public PersonMapper()
+    {
+        UseConstructor(
+            source => source.Name,
+            source => source.Age
+        );
+    }
 }
 ```
 
@@ -358,6 +469,47 @@ public partial class UserMapper
 ### When to Use IgnoreMember
 
 - **Optional fields**: Properties that should remain null/default
+
+## Fully Qualified Type Names
+
+Mapgen supports using fully qualified type names alongside type aliases. This is particularly useful when:
+- Working with types that have naming conflicts
+- Dealing with types from different namespaces with the same name
+- Making code more explicit about type origins
+
+### Basic Fully Qualified Names
+
+You can use fully qualified names for any type in your mapper definitions:
+
+```csharp
+[Mapper]
+public partial class PersonMapper
+{
+    // Using fully qualified names for clarity
+    public partial System.Collections.Generic.List<PersonDto> MapPersonList(
+        System.Collections.Generic.List<Person> source);
+}
+
+// Generated extension method:
+// public static System.Collections.Generic.List<PersonDto> MapPersonList(
+//     this System.Collections.Generic.List<Person> source)
+```
+
+### Mixing Aliases and Fully Qualified Names
+
+You can mix type aliases with fully qualified names in the same mapper:
+
+```csharp
+using System.Collections.Generic;
+
+using PersonResponse = Contracts.PersonDto; 
+
+[Mapper]
+public partial class PersonMapper
+{
+    public partial PersonResponse ToDto(Entities.Person source);
+}
+```
 
 ## Extension Methods
 

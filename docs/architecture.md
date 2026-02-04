@@ -71,7 +71,7 @@ Mapgen is a compile-time source generator that analyzes mapper class definitions
 #### Mapgen.Analyzer
 The single package that contains both the source generator implementation and generates the public API:
 
-**Generated Public API** (in `Mapgen.Analyzer.Abstractions` namespace):
+**Generated Public API** (in `Mapgen.Analyzer` namespace):
 - `MapperAttribute` - Marks a class as a mapper (auto-generated at compile time)
 - Other attributes and abstractions as needed
 

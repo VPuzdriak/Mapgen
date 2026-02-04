@@ -29,9 +29,10 @@ Update your `.csproj`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.0.0" 
-                      OutputItemType="Analyzer" 
-                      ReferenceOutputAssembly="false"/>
+    <PackageReference Include="Mapgen.Analyzer" Version="1.0.1">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
 </ItemGroup>
 ```
 
@@ -56,7 +57,7 @@ var userDto = mapper.ToDto(user);
 
 ### Mapgen
 ```csharp
-using Mapgen.Analyzer.Abstractions;
+using Mapgen.Analyzer;
 
 [Mapper]
 public partial class UserMapper
@@ -91,7 +92,7 @@ public partial class UserMapper
 
 ### Mapgen - Constructor Configuration
 ```csharp
-using Mapgen.Analyzer.Abstractions;
+using Mapgen.Analyzer;
 
 [Mapper]
 public partial class UserMapper
@@ -576,7 +577,7 @@ public partial class OrderMapper
 ## Migration Checklist
 
 - [ ] Replace Mapperly package with Mapgen.Analyzer package
-- [ ] Change using statement from `Riok.Mapperly.Abstractions` to `Mapgen.Analyzer.Abstractions`
+- [ ] Change using statement from `Riok.Mapperly.Abstractions` to `Mapgen.Analyzer`
 - [ ] Convert `[MapProperty]` attributes to `MapMember()` calls in constructor
 - [ ] Convert string property names to lambda expressions
 - [ ] Replace `[MapperIgnoreTarget]` with `IgnoreMember()`

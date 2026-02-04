@@ -47,7 +47,7 @@ All mapping code is generated at compile time using source generators. This mean
 ## Quick Example
 
 ```csharp
-using Mapgen.Analyzer.Abstractions;
+using Mapgen.Analyzer;
 
 // Define your mapper
 [Mapper]
@@ -82,14 +82,17 @@ var carDto = car.ToCarDto();
 ## Installation
 
 ```bash
-dotnet add package Mapgen.Analyzer
+dotnet add package Mapgen.Analyzer --version 1.0.1
 ```
 
 Or add to your `.csproj`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.0.0" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+    <PackageReference Include="Mapgen.Analyzer" Version="1.0.1">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
 </ItemGroup>
 ```
 

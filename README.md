@@ -288,7 +288,7 @@ dotnet add package Mapgen.Analyzer
 ### Package Reference
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.0.0" 
+    <PackageReference Include="Mapgen.Analyzer" Version="1.0.1" 
                       OutputItemType="Analyzer" 
                       ReferenceOutputAssembly="false"/>
 </ItemGroup>
