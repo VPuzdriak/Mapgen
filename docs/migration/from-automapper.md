@@ -32,7 +32,7 @@ Update your `.csproj`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.0.1">
+    <PackageReference Include="Mapgen.Analyzer" Version="1.1.0">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
