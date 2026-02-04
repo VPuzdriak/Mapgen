@@ -57,13 +57,16 @@ namespace Mapgen.Analyzer.Mapper
       // Extract using directives from the source file
       var usings = SyntaxHelpers.ExtractUsings(ctx.TargetNode);
 
+      // Detect nullable context
+      var nullableEnabled = SyntaxHelpers.IsNullableEnabled(ctx.TargetNode, ctx.SemanticModel);
+
       var classDiagnostics = new List<MapperDiagnostic>();
       // Validate mapper constructor has no parameters
       ValidateMapperConstructor(ctx.TargetNode, mapperName, classDiagnostics);
 
 
       var methodMetadata = TransformMappingMethod(ctx, mapperDeclaration, mapperName, classDiagnostics, ct);
-      return new MappingConfigurationMetadata(usings, mapperNamespace, mapperName, mapperDeclaration.DeclaredAccessibility, methodMetadata, classDiagnostics);
+      return new MappingConfigurationMetadata(usings, mapperNamespace, mapperName, mapperDeclaration.DeclaredAccessibility, methodMetadata, classDiagnostics, nullableEnabled);
     }
 
     private static void ValidateMapperConstructor(SyntaxNode classNode, string mapperName, List<MapperDiagnostic> classDiagnostics)
