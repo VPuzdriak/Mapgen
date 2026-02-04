@@ -28,13 +28,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
   /// </summary>
   public bool HasUseConstructorCall(SyntaxNode classNode)
   {
-    var constructor = GetMapperConstructor(classNode);
-    if (constructor is null)
-    {
-      return false;
-    }
-
-    return FindMethodInvocations(constructor, MappingConfigurationMethods.UseConstructorMethodName).Any();
+    return HasConfigurationMethodCall(classNode, MappingConfigurationMethods.UseConstructorMethodName);
   }
 
   /// <summary>
@@ -42,13 +36,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
   /// </summary>
   public bool HasUseEmptyConstructorCall(SyntaxNode classNode)
   {
-    var constructor = GetMapperConstructor(classNode);
-    if (constructor is null)
-    {
-      return false;
-    }
-
-    return FindMethodInvocations(constructor, MappingConfigurationMethods.UseEmptyConstructorMethodName).Any();
+    return HasConfigurationMethodCall(classNode, MappingConfigurationMethods.UseEmptyConstructorMethodName);
   }
 
   /// <summary>
@@ -56,16 +44,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
   /// </summary>
   public Location? GetUseEmptyConstructorCallLocation(SyntaxNode classNode)
   {
-    var constructor = GetMapperConstructor(classNode);
-    if (constructor is null)
-    {
-      return null;
-    }
-
-    var useEmptyConstructorCall = FindMethodInvocations(constructor, MappingConfigurationMethods.UseEmptyConstructorMethodName)
-      .FirstOrDefault();
-
-    return useEmptyConstructorCall?.GetLocation();
+    return GetConfigurationMethodCallLocation(classNode, MappingConfigurationMethods.UseEmptyConstructorMethodName);
   }
 
   /// <summary>
@@ -85,7 +64,7 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
     }
 
     // Find UseConstructor invocation
-    var useConstructorCall = FindMethodInvocations(constructor, MappingConfigurationMethods.UseConstructorMethodName)
+    var useConstructorCall = GetConfigurationMethodCalls(constructor, MappingConfigurationMethods.UseConstructorMethodName)
       .FirstOrDefault();
 
     if (useConstructorCall is null)
@@ -123,12 +102,13 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
   /// <summary>
   /// Checks if a constructor can be automatically mapped from source type members (properties and fields).
   /// A constructor is auto-mappable if all its parameters can be matched to source members
-  /// by name (case-insensitive) and the types are compatible (same or implicitly convertible).
+  /// by name (case-insensitive) and the types are compatible (same, implicitly convertible, or mappable via included mapper).
   /// </summary>
   /// <param name="constructor">The constructor to check.</param>
   /// <param name="sourceType">The source type to map from.</param>
+  /// <param name="methodMetadata">The mapper method metadata containing included mappers.</param>
   /// <returns>True if all constructor parameters can be automatically mapped, false otherwise.</returns>
-  public bool CanAutoMapConstructor(IMethodSymbol constructor, INamedTypeSymbol sourceType)
+  public bool CanAutoMapConstructor(IMethodSymbol constructor, INamedTypeSymbol sourceType, MapperMethodMetadata methodMetadata)
   {
     if (constructor.Parameters.Length == 0)
     {
@@ -154,8 +134,9 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
         return false; // Source member can't be read
       }
 
-      // Check type compatibility
-      if (!AreTypesCompatible(sourceMember.Type, parameter.Type))
+      // Check type compatibility (direct match, implicit conversion, or included mapper)
+      if (!AreTypesCompatible(sourceMember.Type, parameter.Type) &&
+          !CanMapViaIncludedMapper(sourceMember.Type, parameter.Type, methodMetadata))
       {
         return false; // Types are not compatible
       }
@@ -169,20 +150,61 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
   /// </summary>
   private bool AreTypesCompatible(ITypeSymbol sourceType, ITypeSymbol destinationType)
   {
-    // Exact match (including nullable annotations)
-    if (SymbolEqualityComparer.Default.Equals(sourceType, destinationType))
+    return TypeCompatibilityChecker.AreTypesCompatible(sourceType, destinationType, _semanticModel);
+  }
+
+  /// <summary>
+  /// Checks if there's an included mapper that can map from source type to destination type.
+  /// </summary>
+  private static bool CanMapViaIncludedMapper(ITypeSymbol sourceType, ITypeSymbol destinationType, MapperMethodMetadata methodMetadata)
+  {
+    return IncludedMapperHelpers.TryFindIncludedMapperMethod(
+      sourceType,
+      destinationType,
+      methodMetadata,
+      out _,
+      out _,
+      out _);
+  }
+
+  /// <summary>
+  /// Builds the expression for a constructor argument, using an included mapper if types don't match directly.
+  /// </summary>
+  public string BuildConstructorArgumentExpression(
+    MemberInfo sourceMember,
+    ITypeSymbol parameterType,
+    MapperMethodMetadata methodMetadata)
+  {
+    var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
+
+    // If types match directly, just use the source expression
+    if (AreTypesCompatible(sourceMember.Type, parameterType))
     {
-      return true;
+      return sourceExpression;
     }
 
-    // Check for implicit conversion
-    if (_semanticModel.Compilation is Microsoft.CodeAnalysis.CSharp.CSharpCompilation csharpCompilation)
+    // Try to find an included mapper that can handle the conversion
+    if (IncludedMapperHelpers.TryFindIncludedMapperMethod(
+          sourceMember.Type,
+          parameterType,
+          methodMetadata,
+          out var includedMapper,
+          out var mapperMethod,
+          out var isCollectionMapping))
     {
-      var conversion = csharpCompilation.ClassifyConversion(sourceType, destinationType);
-      return conversion is { IsImplicit: true, IsUserDefined: false };
+      // Build the mapping expression using the found mapper
+      return IncludedMapperHelpers.BuildMappingExpression(
+        sourceExpression,
+        sourceMember.Type,
+        parameterType,
+        includedMapper!,
+        mapperMethod!,
+        isCollectionMapping,
+        methodMetadata);
     }
 
-    return false;
+    // Fallback: just use the source expression (will likely cause a compilation error, but that's better than nothing)
+    return sourceExpression;
   }
 
   /// <summary>
@@ -240,5 +262,35 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
     });
 
     return string.Join("\n", signatures);
+  }
+
+  /// <summary>
+  /// Checks if the mapper constructor body contains any calls to a specific configuration method.
+  /// </summary>
+  private static bool HasConfigurationMethodCall(SyntaxNode classNode, string methodName)
+  {
+    var constructor = GetMapperConstructor(classNode);
+    if (constructor is null)
+    {
+      return false;
+    }
+
+    return GetConfigurationMethodCalls(constructor, methodName).Any();
+  }
+
+  /// <summary>
+  /// Gets the location of the first call to a specific configuration method in the constructor body.
+  /// Used for diagnostic reporting.
+  /// </summary>
+  private static Location? GetConfigurationMethodCallLocation(SyntaxNode classNode, string methodName)
+  {
+    var constructor = GetMapperConstructor(classNode);
+    if (constructor is null)
+    {
+      return null;
+    }
+
+    var invocation = GetConfigurationMethodCalls(constructor, methodName).FirstOrDefault();
+    return invocation?.GetLocation();
   }
 }

@@ -27,7 +27,7 @@ public sealed class CollectionMappingStrategy : BaseMappingStrategy
     }
 
     // Find all MapCollection invocations (both generic and non-generic)
-    var mapCollectionCalls = FindMethodInvocations(constructor, MappingConfigurationMethods.MapCollectionMethodName);
+    var mapCollectionCalls = GetConfigurationMethodCalls(constructor, MappingConfigurationMethods.MapCollectionMethodName);
 
     foreach (var mapCollectionCall in mapCollectionCalls)
     {

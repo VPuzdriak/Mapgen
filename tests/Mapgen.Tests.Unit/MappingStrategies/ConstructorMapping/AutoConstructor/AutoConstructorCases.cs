@@ -13,12 +13,7 @@ public class AutoConstructorCases
   public void When_ConstructorParametersMatchSourceProperties_Should_AutoMapConstructor()
   {
     // Arrange
-    var product = new Product
-    {
-      Name = "Laptop",
-      Price = 999.99m,
-      Category = "Electronics"
-    };
+    var product = new Product { Name = "Laptop", Price = 999.99m, Category = "Electronics" };
     var mapper = new AutoProductMapper();
 
     // Act
@@ -34,12 +29,7 @@ public class AutoConstructorCases
   public void When_AutoMappingConstructor_Should_MapRemainingPropertiesViaInitializer()
   {
     // Arrange
-    var product = new Product
-    {
-      Name = "Mouse",
-      Price = 29.99m,
-      Category = "Accessories"
-    };
+    var product = new Product { Name = "Mouse", Price = 29.99m, Category = "Accessories" };
     var mapper = new AutoProductMapper();
 
     // Act
@@ -53,12 +43,7 @@ public class AutoConstructorCases
   public void When_AutoMappingConstructor_Should_CreateValidInstance()
   {
     // Arrange
-    var product = new Product
-    {
-      Name = "Keyboard",
-      Price = 79.99m,
-      Category = "Peripherals"
-    };
+    var product = new Product { Name = "Keyboard", Price = 79.99m, Category = "Peripherals" };
     var mapper = new AutoProductMapper();
 
     // Act
@@ -74,11 +59,7 @@ public class AutoConstructorCases
   public void When_ConstructorParametersHaveImplicitConversion_Should_AutoMapConstructor()
   {
     // Arrange - Person has int Age, PersonDto has long Age (implicit conversion)
-    var person = new Person
-    {
-      Name = "John Doe",
-      Age = 30
-    };
+    var person = new Person { Name = "John Doe", Age = 30 };
     var mapper = new AutoPersonMapper();
 
     // Act
@@ -93,11 +74,7 @@ public class AutoConstructorCases
   public void When_AutoMappingWithImplicitConversion_Should_PreserveValues()
   {
     // Arrange
-    var person = new Person
-    {
-      Name = "Jane Smith",
-      Age = 25
-    };
+    var person = new Person { Name = "Jane Smith", Age = 25 };
     var mapper = new AutoPersonMapper();
 
     // Act
@@ -105,5 +82,23 @@ public class AutoConstructorCases
 
     // Assert - Implicit int to long conversion should work correctly
     result.Age.Should().Be(25L);
+  }
+
+  [Fact]
+  public void When_MapperIsIncluded_Should_MapToCtorParameters()
+  {
+    // Arrange - Shop has MainProduct of type Product, ShopDto constructor takes ProductDto
+    var shop = new Shop { Products = [new Product { Name = "Laptop", Price = 999.99m, Category = "Electronics" }] };
+    var mapper = new AutoShopMapper();
+
+    // Act
+    var result = mapper.ToDto(shop);
+
+    // Assert
+    result.Should().NotBeNull();
+    result.Products.Should().NotBeNull();
+    result.Products[0].Name.Should().Be(shop.Products[0].Name);
+    result.Products[0].Price.Should().Be(shop.Products[0].Price);
+    result.Products[0].Category.Should().Be(shop.Products[0].Category);
   }
 }

@@ -25,7 +25,7 @@ public sealed class CustomMappingStrategy : BaseMappingStrategy
     }
 
     // Find all MapMember invocations
-    var mapMemberCalls = FindMethodInvocations(constructor, MappingConfigurationMethods.MapMemberMethodName);
+    var mapMemberCalls = GetConfigurationMethodCalls(constructor, MappingConfigurationMethods.MapMemberMethodName);
 
     foreach (var mapMemberCall in mapMemberCalls)
     {
