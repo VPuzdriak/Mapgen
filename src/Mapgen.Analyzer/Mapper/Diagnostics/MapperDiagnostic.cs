@@ -1,4 +1,7 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using System.Linq;
+
+using Microsoft.CodeAnalysis;
 
 namespace Mapgen.Analyzer.Mapper.Diagnostics;
 
@@ -50,7 +53,8 @@ public sealed class MapperDiagnostic
     return new MapperDiagnostic(
       id: DiagnosticIds.MissingPropertyMapping,
       title: $"Missing {memberType} mapping",
-      messageFormat: $"\"{{0}}\" type has \"{{1}}\" {memberType} which does not exist in \"{{2}}\" type. Please, add custom mapping using {{3}}() or ignore this {memberType} explicitly using {{4}}().",
+      messageFormat:
+      $"\"{{0}}\" type has \"{{1}}\" {memberType} which does not exist in \"{{2}}\" type. Please, add custom mapping using {{3}}() or ignore this {memberType} explicitly using {{4}}().",
       severity: DiagnosticSeverity.Error,
       location: location,
       returnTypeName,
@@ -135,6 +139,33 @@ public sealed class MapperDiagnostic
       severity: DiagnosticSeverity.Error,
       location: location,
       propertyName);
+  }
+
+  public static MapperDiagnostic IncompatibleEnumMapping(
+    Location? location,
+    string destinationTypeName,
+    string memberName,
+    string destinationEnumType,
+    string sourceTypeName,
+    string sourceEnumType,
+    IReadOnlyList<string> missingMembers,
+    string mapMemberMethodName,
+    string memberTypeText)
+  {
+    return new MapperDiagnostic(
+      id: DiagnosticIds.IncompatibleEnumMapping,
+      title: "Incompatible enum mapping",
+      messageFormat:
+      $"Enum {memberTypeText} \"{{0}}.{{1}}\" of type \"{{2}}\" cannot be automatically mapped from \"{{3}}.{{1}}\" of type \"{{4}}\" because source enum has members not present in destination: {{5}}. Use {{6}}() to create custom mapping with explicit handling for these values.",
+      severity: DiagnosticSeverity.Error,
+      location: location,
+      destinationTypeName,
+      memberName,
+      destinationEnumType,
+      sourceTypeName,
+      sourceEnumType,
+      string.Join(", ", missingMembers.Select(m => $"\"{m}\"")),
+      mapMemberMethodName);
   }
 
   public static MapperDiagnostic ParameterizedConstructorRequired(

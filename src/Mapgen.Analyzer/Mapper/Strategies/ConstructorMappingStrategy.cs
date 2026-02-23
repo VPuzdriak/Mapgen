@@ -90,13 +90,63 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
 
         if (bodyExpression != null)
         {
-
           constructorArguments.Add(bodyExpression);
         }
       }
     }
 
     return constructorArguments;
+  }
+
+  /// <summary>
+  /// Analyzes constructor parameters and generates enum mapping methods when constructor parameters
+  /// are enums that can be mapped from source type properties with matching names.
+  /// This is similar to how DirectMappingStrategy generates enum mappings for properties.
+  /// </summary>
+  public void GenerateEnumMappingsForConstructor(
+    IMethodSymbol constructor,
+    INamedTypeSymbol sourceType,
+    MapperMethodMetadata methodMetadata)
+  {
+    foreach (var parameter in constructor.Parameters)
+    {
+      // Find source member by name (case-insensitive match)
+      var sourceMember = FindMatchingSourceMember(sourceType, parameter.Name, StringComparison.OrdinalIgnoreCase);
+
+      if (sourceMember == null || !sourceMember.IsReadable())
+      {
+        continue;
+      }
+
+      // Check if both are compatible enums
+      if (TypeCompatibilityChecker.AreEnumsCompatible(sourceMember.Type, parameter.Type, out _))
+      {
+        // Register enum mapping
+        EnumMappingHelpers.RegisterEnumMapping(sourceMember.Type, parameter.Type, methodMetadata);
+      }
+
+      // Check if both are collections with compatible enum elements
+      var sourceElementType = CollectionHelpers.GetCollectionElementType(sourceMember.Type);
+      var destElementType = CollectionHelpers.GetCollectionElementType(parameter.Type);
+
+      if (sourceElementType != null && destElementType != null)
+      {
+        if (TypeCompatibilityChecker.AreEnumsCompatible(sourceElementType, destElementType, out _))
+        {
+          // Register enum mapping for collection elements
+          EnumMappingHelpers.RegisterEnumMapping(sourceElementType, destElementType, methodMetadata);
+        }
+      }
+    }
+  }
+
+  /// <summary>
+  /// Finds a source member (property or field) by name with the specified string comparison.
+  /// </summary>
+  private static MemberInfo? FindMatchingSourceMember(INamedTypeSymbol sourceType, string memberName, StringComparison comparison)
+  {
+    var members = sourceType.GetAllMembers().ToList();
+    return members.FirstOrDefault(m => string.Equals(m.Name, memberName, comparison));
   }
 
   /// <summary>
@@ -134,9 +184,25 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
         return false; // Source member can't be read
       }
 
-      // Check type compatibility (direct match, implicit conversion, or included mapper)
-      if (!AreTypesCompatible(sourceMember.Type, parameter.Type) &&
-          !CanMapViaIncludedMapper(sourceMember.Type, parameter.Type, methodMetadata))
+      // Check type compatibility (direct match, implicit conversion, enum compatibility, or included mapper)
+      var isCompatible = AreTypesCompatible(sourceMember.Type, parameter.Type) ||
+                         TypeCompatibilityChecker.AreEnumsCompatible(sourceMember.Type, parameter.Type, out _) ||
+                         CanMapViaIncludedMapper(sourceMember.Type, parameter.Type, methodMetadata);
+
+      // Also check if both are collections with compatible enum elements
+      if (!isCompatible)
+      {
+        var sourceElementType = CollectionHelpers.GetCollectionElementType(sourceMember.Type);
+        var destElementType = CollectionHelpers.GetCollectionElementType(parameter.Type);
+
+        if (sourceElementType != null && destElementType != null)
+        {
+          // Both are collections - check if elements are compatible enums
+          isCompatible = TypeCompatibilityChecker.AreEnumsCompatible(sourceElementType, destElementType, out _);
+        }
+      }
+
+      if (!isCompatible)
       {
         return false; // Types are not compatible
       }
@@ -181,6 +247,42 @@ public sealed class ConstructorMappingStrategy : BaseMappingStrategy
     if (AreTypesCompatible(sourceMember.Type, parameterType))
     {
       return sourceExpression;
+    }
+
+    // Check if both are compatible enums (same member names)
+    if (TypeCompatibilityChecker.AreEnumsCompatible(sourceMember.Type, parameterType, out _))
+    {
+      // Generate method call expression for enum mapping
+      return EnumMappingHelpers.GenerateEnumMappingExpression(
+        sourceMember.Type,
+        parameterType,
+        sourceExpression,
+        methodMetadata);
+    }
+
+    // Check if both are collections with compatible enum elements
+    var sourceElementType = CollectionHelpers.GetCollectionElementType(sourceMember.Type);
+    var destElementType = CollectionHelpers.GetCollectionElementType(parameterType);
+
+    if (sourceElementType != null && destElementType != null)
+    {
+      // Both are collections - check if elements are compatible enums
+      if (TypeCompatibilityChecker.AreEnumsCompatible(sourceElementType, destElementType, out _))
+      {
+        // Generate collection mapping with enum method call for each element
+        var itemParamName = CollectionHelpers.GetItemParameterName(sourceElementType);
+        var itemTransformExpression = EnumMappingHelpers.GenerateEnumMappingExpression(
+          sourceElementType,
+          destElementType,
+          itemParamName,
+          methodMetadata);
+
+        return CollectionHelpers.BuildCollectionMappingExpression(
+          sourceExpression,
+          itemParamName,
+          itemTransformExpression,
+          parameterType);
+      }
     }
 
     // Try to find an included mapper that can handle the conversion

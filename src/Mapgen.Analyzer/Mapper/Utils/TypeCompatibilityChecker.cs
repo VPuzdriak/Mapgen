@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Linq;
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -71,11 +74,24 @@ internal static class TypeCompatibilityChecker
   /// <summary>
   /// Checks if the nullable annotation mismatch represents a nullable-to-non-nullable scenario.
   /// This is a potential issue that should be reported as a diagnostic.
+  /// Handles both reference types (string? -> string) and value types (int? -> int, OrderStatus? -> OrderStatusDto).
   /// </summary>
   public static bool IsNullableToNonNullableMismatch(
     ITypeSymbol sourceType,
     ITypeSymbol destType)
   {
+    // Check for Nullable<T> value types (int?, OrderStatus?, etc.)
+    if (sourceType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } &&
+        destType is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+    {
+      // Source is Nullable<T> but destination is not nullable
+      // For enums: OrderStatus? -> OrderStatusDto  
+      // For value types: int? -> int
+      // Both should be reported as nullable-to-non-nullable mismatch
+      return true;
+    }
+
+    // Case 2: Reference types with nullable annotation (string? -> string)
     // Types must match ignoring nullability
     if (!AreTypesMatchIgnoringNullability(sourceType, destType))
     {
@@ -86,5 +102,76 @@ internal static class TypeCompatibilityChecker
     var destIsNullable = destType.NullableAnnotation == NullableAnnotation.Annotated;
 
     return sourceIsNullable && !destIsNullable;
+  }
+
+  /// <summary>
+  /// Checks if both types are enums and determines their compatibility.
+  /// </summary>
+  /// <param name="sourceType">Source enum type</param>
+  /// <param name="destType">Destination enum type</param>
+  /// <param name="missingMembers">Output parameter containing source members not in destination (comma-separated)</param>
+  /// <returns>True if enums are compatible (all source members exist in destination), false otherwise</returns>
+  public static bool AreEnumsCompatible(
+    ITypeSymbol sourceType,
+    ITypeSymbol destType,
+    out IReadOnlyList<string> missingMembers)
+  {
+    missingMembers = [];
+
+    // Unwrap nullable enums to their underlying enum types
+    var sourceEnumType = sourceType;
+    if (sourceType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T, TypeArguments.Length: 1 } sourceNullable)
+    {
+      sourceEnumType = sourceNullable.TypeArguments[0];
+    }
+
+    var destEnumType = destType;
+    if (destType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T, TypeArguments.Length: 1 } destNullable)
+    {
+      destEnumType = destNullable.TypeArguments[0];
+    }
+
+    // Both must be enums
+    if (sourceEnumType.TypeKind != TypeKind.Enum || destEnumType.TypeKind != TypeKind.Enum)
+    {
+      return false;
+    }
+
+    // If they're the same type, they're compatible
+    if (AreTypesExactMatch(sourceEnumType, destEnumType))
+    {
+      return true;
+    }
+
+    // Get enum members
+    var sourceMembers = GetEnumMemberNames(sourceEnumType);
+    var destMembers = GetEnumMemberNames(destEnumType);
+
+    // Check if all source members exist in destination
+    missingMembers = sourceMembers.Where(sm => !destMembers.Contains(sm)).ToList();
+
+    if (missingMembers.Any())
+    {
+      return false;
+    }
+
+    return true;
+  }
+
+  /// <summary>
+  /// Gets the names of all enum members from an enum type.
+  /// </summary>
+  public static List<string> GetEnumMemberNames(ITypeSymbol enumType)
+  {
+    if (enumType is not INamedTypeSymbol namedType)
+    {
+      return new List<string>();
+    }
+
+    return namedType.GetMembers()
+      .OfType<IFieldSymbol>()
+      .Where(f => f.IsConst && f.HasConstantValue)
+      .Select(f => f.Name)
+      .ToList();
   }
 }

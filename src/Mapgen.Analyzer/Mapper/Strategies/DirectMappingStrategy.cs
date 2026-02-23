@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 using Mapgen.Analyzer.Mapper.Diagnostics;
 using Mapgen.Analyzer.Mapper.MappingDescriptors;
@@ -23,11 +24,26 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
       return CreateSuccessfulMapping(sourceMember, destMember, methodMetadata);
     }
 
-    // Types don't match - check for special cases
+    // Check for nullable-to-non-nullable mismatch BEFORE enum check
+    // This handles both value types (int? -> int) and enums (OrderStatus? -> OrderStatusDto)
     if (TypeCompatibilityChecker.IsNullableToNonNullableMismatch(sourceMember.Type, destMember.Type))
     {
       return CreateNullableMismatchDiagnostic(sourceMember, destMember, methodMetadata);
     }
+
+    // Check if both are enums with compatible members
+    if (TypeCompatibilityChecker.AreEnumsCompatible(sourceMember.Type, destMember.Type, out var missingMembers))
+    {
+      // Enums are compatible - create mapping with cast
+      return CreateEnumMapping(sourceMember, destMember, methodMetadata);
+    }
+
+    // If enums but incompatible, report specific enum diagnostic
+    if (missingMembers.Any())
+    {
+      return CreateIncompatibleEnumDiagnostic(sourceMember, destMember, missingMembers, methodMetadata);
+    }
+
 
     // Check if there's an implicit conversion from source to destination type (for different types like short -> int)
     if (TypeCompatibilityChecker.HasImplicitConversion(sourceMember.Type, destMember.Type, semanticModel))
@@ -76,9 +92,12 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
     // Check if element types are directly compatible (exact match or implicit conversion)
     var elementTypesMatch = TypeCompatibilityChecker.AreTypesExactMatch(sourceElementType, destElementType);
     var hasImplicitConversion = !elementTypesMatch &&
-      TypeCompatibilityChecker.HasImplicitConversion(sourceElementType, destElementType, semanticModel);
+                                TypeCompatibilityChecker.HasImplicitConversion(sourceElementType, destElementType, semanticModel);
 
-    if (!elementTypesMatch && !hasImplicitConversion)
+    // Check if element types are compatible enums (same member names)
+    var areEnumsCompatible = TypeCompatibilityChecker.AreEnumsCompatible(sourceElementType, destElementType, out _);
+
+    if (!elementTypesMatch && !hasImplicitConversion && !areEnumsCompatible)
     {
       // Element types are not compatible
       return null;
@@ -88,14 +107,32 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
     var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
     var itemParamName = CollectionHelpers.GetItemParameterName(sourceElementType);
 
-    // When element types differ (even with implicit conversion), we need explicit cast
-    // because generic interfaces are invariant in C#.
-    // Example: List<short> -> IImmutableList<long>
-    // Without cast: Select(x => x).ToImmutableList() returns ImmutableList<short>
-    // With cast: Select(x => (long)x).ToImmutableList() returns ImmutableList<long>
-    var itemTransformExpression = hasImplicitConversion
-      ? $"({destElementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)}){itemParamName}"
-      : itemParamName;
+    // Determine the item transformation expression
+    string itemTransformExpression;
+
+    if (areEnumsCompatible)
+    {
+      // For enums, generate method call expression for mapping
+      itemTransformExpression = EnumMappingHelpers.GenerateEnumMappingExpression(
+        sourceElementType,
+        destElementType,
+        itemParamName,
+        methodMetadata);
+    }
+    else if (hasImplicitConversion)
+    {
+      // When element types differ (even with implicit conversion), we need explicit cast
+      // because generic interfaces are invariant in C#.
+      // Example: List<short> -> IImmutableList<long>
+      // Without cast: Select(x => x).ToImmutableList() returns ImmutableList<short>
+      // With cast: Select(x => (long)x).ToImmutableList() returns ImmutableList<long>
+      itemTransformExpression = $"({destElementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)}){itemParamName}";
+    }
+    else
+    {
+      // Exact match - no transformation needed
+      itemTransformExpression = itemParamName;
+    }
 
     var mappingExpression = CollectionHelpers.BuildCollectionMappingExpression(
       sourceExpression,
@@ -145,6 +182,49 @@ public sealed class DirectMappingStrategy(SemanticModel semanticModel)
   {
     var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
     return new MappingDescriptor(destMember.Name, sourceExpression);
+  }
+
+  private MappingDescriptor CreateEnumMapping(
+    MemberInfo sourceMember,
+    MemberInfo destMember,
+    MapperMethodMetadata methodMetadata)
+  {
+    var sourceExpression = $"{methodMetadata.SourceObjectParameter.Name}.{sourceMember.Name}";
+
+
+    // Generate method call expression for enum mapping
+    // This will register the method and return a call expression like "MapOrderStatusToOrderStatusDto(order.Status)"
+    var mappingExpression = EnumMappingHelpers.GenerateEnumMappingExpression(
+      sourceMember.Type,
+      destMember.Type,
+      sourceExpression,
+      methodMetadata);
+
+    return new MappingDescriptor(destMember.Name, mappingExpression);
+  }
+
+
+  private DiagnosedPropertyDescriptor CreateIncompatibleEnumDiagnostic(
+    MemberInfo sourceMember,
+    MemberInfo destMember,
+    IReadOnlyList<string> missingMembers,
+    MapperMethodMetadata methodMetadata)
+  {
+    var memberType = destMember.IsField ? "field" : "property";
+
+    var diagnostic = MapperDiagnostic.IncompatibleEnumMapping(
+      methodMetadata.MethodSymbol.Locations.FirstOrDefault(),
+      methodMetadata.ReturnTypeName,
+      destMember.Name,
+      destMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+      methodMetadata.SourceObjectParameter.Symbol.Type.Name,
+      sourceMember.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+      missingMembers,
+      MappingConfigurationMethods.MapMemberMethodName,
+      memberType);
+
+    methodMetadata.AddDiagnostic(diagnostic);
+    return new DiagnosedPropertyDescriptor(destMember.Name);
   }
 
   private DiagnosedPropertyDescriptor CreateNullableMismatchDiagnostic(

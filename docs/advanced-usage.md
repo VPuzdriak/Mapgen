@@ -138,7 +138,171 @@ public ProductMapper()
 
 > **Important Rule:** Mapgen will show an **error** (MAPPER008) if multiple constructors exist without explicit configuration. This prevents ambiguity and ensures predictable behavior.
 
-### Explicit Constructor Mapping
+#### Automatic Enum Mapping in Constructors
+
+Just like property mapping, **Mapgen automatically maps enum types by name in constructor parameters**. When a constructor parameter is an enum that differs from the source property enum type, Mapgen generates static helper methods that can be used both automatically and manually in your configurations.
+
+**How it works:**
+
+1. **Automatic mapping** - When constructor auto-mapping is possible, enum parameters are mapped automatically
+2. **Helper methods generated** - Mapgen generates `MapTo{EnumName}` helper methods for enum conversions
+3. **Available for manual use** - These helpers are available in `UseConstructor()` configurations
+
+**Example - Automatic enum mapping in constructor:**
+
+```csharp
+// Source enums
+public enum OrderPriority { Low, Medium, High }
+public enum OrderStatus { Pending, Shipped, Delivered, Cancelled }
+
+// Destination enums (different types)
+public enum OrderPriorityDto { Low, Medium, High }
+public enum OrderStatusDto { Pending, Shipped, Delivered, Cancelled, Reviewed }
+
+// Source
+public class Order
+{
+    public int Id { get; set; }
+    public int CustomerId { get; set; }
+    public OrderPriority OrderPriority { get; set; }
+    public OrderStatus? CurrentStatus { get; set; }
+    public List<OrderStatus> StatusHistory { get; set; }
+}
+
+// Destination with enum constructor parameter
+public class OrderDto
+{
+    public int Id { get; }
+    public int CustomerId { get; }
+    public bool IsVipOrder { get; }
+    public OrderStatusDto? CurrentStatus { get; set; }
+    public IImmutableList<OrderStatusDto> StatusHistory { get; set; }
+
+    // Constructor with enum parameter - automatically mapped!
+    public OrderDto(int id, int customerId, OrderPriorityDto orderPriority)
+    {
+        Id = id;
+        CustomerId = customerId;
+        IsVipOrder = orderPriority == OrderPriorityDto.High;
+    }
+}
+
+// Mapper - NO configuration needed, enums automatically mapped!
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    // ✅ OrderPriority → OrderPriorityDto (constructor param)
+    // ✅ CurrentStatus → OrderStatusDto? (nullable property)
+    // ✅ StatusHistory collection elements mapped
+}
+```
+
+**Generated code:**
+```csharp
+public OrderDto ToDto(Order order)
+{
+    return new OrderDto(
+        order.Id,
+        order.CustomerId,
+        MapToOrderPriorityDto(order.OrderPriority)  // Helper method auto-generated
+    )
+    {
+        CurrentStatus = MapToOrderStatusDto(order.CurrentStatus),
+        StatusHistory = order.StatusHistory
+            .Select(orderStatus => MapToOrderStatusDto(orderStatus))
+            .ToImmutableList()
+    };
+}
+
+// Helper methods generated automatically:
+private static OrderPriorityDto MapToOrderPriorityDto(OrderPriority value) 
+    => value switch
+    {
+        OrderPriority.Low => OrderPriorityDto.Low,
+        OrderPriority.Medium => OrderPriorityDto.Medium,
+        OrderPriority.High => OrderPriorityDto.High,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+    };
+
+private static OrderStatusDto MapToOrderStatusDto(OrderStatus value) 
+    => value switch
+    {
+        OrderStatus.Pending => OrderStatusDto.Pending,
+        OrderStatus.Shipped => OrderStatusDto.Shipped,
+        OrderStatus.Delivered => OrderStatusDto.Delivered,
+        OrderStatus.Cancelled => OrderStatusDto.Cancelled,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+    };
+
+// Nullable overloads also generated:
+private static OrderPriorityDto? MapToOrderPriorityDto(OrderPriority? value) 
+    => value.HasValue ? MapToOrderPriorityDto(value.Value) : null;
+
+private static OrderStatusDto? MapToOrderStatusDto(OrderStatus? value) 
+    => value.HasValue ? MapToOrderStatusDto(value.Value) : null;
+```
+
+**Using helper methods in manual configurations:**
+
+Even when you need to use explicit `UseConstructor()`, **the enum helper methods are automatically generated and available for you to use**:
+
+```csharp
+public class OrderDto
+{
+    public int Id { get; }
+    public int CustomerId { get; }
+    public string DisplayStatus { get; }
+    
+    public OrderDto(int id, int customerId, OrderStatusDto status)
+    {
+        Id = id;
+        CustomerId = customerId;
+        DisplayStatus = status.ToString();
+    }
+    
+    // Multiple constructors = must use UseConstructor()
+    public OrderDto() { }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    
+    public OrderMapper()
+    {
+        // Even with explicit UseConstructor(), helper methods are generated!
+        UseConstructor(
+            src => src.Id,
+            src => src.CustomerId,
+            src => MapToOrderStatusDto(src.Status)  // ✅ Helper available!
+        );
+    }
+}
+```
+
+**Key benefits:**
+- ✅ **Code reuse** - Same helper methods for constructor params, properties, and collections
+- ✅ **Name-based mapping** - Enums mapped by member name, not numeric value
+- ✅ **Nullable support** - Both nullable and non-nullable overloads generated automatically
+- ✅ **Collection support** - Enum collections in constructor parameters work seamlessly
+- ✅ **Available in config** - Helper methods can be used in `UseConstructor()` expressions
+
+**When helper methods are generated:**
+- Mapgen analyzes constructor parameters and source properties
+- When it finds enum type mismatches (different enum types with matching names), it generates helpers
+- Works for automatic constructor mapping AND explicit `UseConstructor()` configurations
+- You can reference these helpers by name: `MapTo{DestinationEnumName}`
+
+**Requirements:**
+- Constructor parameter must be an enum (or nullable enum, or collection of enums)
+- Source property with matching name must exist and be an enum of a different type
+- All source enum members must exist in destination enum (destination can have extra members)
+- Member names must match exactly (case-sensitive)
+
+**If requirements aren't met:**
+- If source has members not in destination → MAPPER012 error (see [MAPPER012 diagnostic](#mapper012-incompatible-enum-mapping) for details and solutions)
 
 ### Explicit Constructor Mapping
 
@@ -623,6 +787,129 @@ public ProductMapper()
 }
 ```
 
+### MAPPER012: Incompatible Enum Mapping
+
+**When it occurs:** Source enum has members that don't exist in the destination enum. This prevents automatic enum mapping because Mapgen cannot safely map values that don't have a corresponding destination member.
+
+**Applies to:**
+- Property mappings (direct enum properties)
+- Constructor parameter mappings (enum constructor arguments)
+- Collection mappings (collections of enums)
+
+```csharp
+// Source enum has "Cancelled" but destination doesn't
+public enum PaymentStatus { Pending, Approved, Rejected, Cancelled }
+public enum PaymentStatusDto { Pending, Approved, Rejected }
+
+public class Payment
+{
+    public PaymentStatus Status { get; set; }
+}
+
+public class PaymentDto
+{
+    public PaymentStatusDto Status { get; set; }
+}
+
+[Mapper]
+public partial class PaymentMapper
+{
+    public partial PaymentDto ToDto(Payment payment);
+    
+    // ❌ ERROR MAPPER012: Source enum has member "Cancelled" not present in destination
+}
+```
+
+**Error message example:**
+```
+error MAPPER012: Enum property "PaymentDto.Status" of type "PaymentStatusDto" 
+cannot be automatically mapped from "Payment.Status" of type "PaymentStatus" 
+because source enum has members not present in destination: "Cancelled". 
+Use MapMember() to create custom mapping with explicit handling for these values.
+```
+
+**Fix - Use MapMember() for custom enum mapping:**
+```csharp
+public PaymentMapper()
+{
+    MapMember(dest => dest.Status, src => src.Status switch
+    {
+        PaymentStatus.Pending => PaymentStatusDto.Pending,
+        PaymentStatus.Approved => PaymentStatusDto.Approved,
+        PaymentStatus.Rejected => PaymentStatusDto.Rejected,
+        PaymentStatus.Cancelled => PaymentStatusDto.Rejected,  // Explicit handling
+        _ => throw new ArgumentOutOfRangeException()
+    });
+}
+```
+
+**MAPPER012 in constructor parameters:**
+
+When a constructor parameter is an enum with missing members, the same error applies:
+
+```csharp
+public enum OrderPriority { Low, Medium, High, Critical }  // Source has "Critical"
+public enum OrderPriorityDto { Low, Medium, High }         // Destination doesn't
+
+public class Order
+{
+    public int Id { get; set; }
+    public OrderPriority Priority { get; set; }
+}
+
+public class OrderDto
+{
+    public int Id { get; }
+    
+    // Constructor with enum parameter
+    public OrderDto(int id, OrderPriorityDto priority)
+    {
+        Id = id;
+        // ... use priority
+    }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    
+    // ❌ ERROR MAPPER012: Constructor parameter "priority" has incompatible enum
+}
+```
+
+**Fix - Use UseConstructor() with custom enum mapping:**
+```csharp
+public OrderMapper()
+{
+    UseConstructor(
+        src => src.Id,
+        src => src.Priority switch
+        {
+            OrderPriority.Low => OrderPriorityDto.Low,
+            OrderPriority.Medium => OrderPriorityDto.Medium,
+            OrderPriority.High => OrderPriorityDto.High,
+            OrderPriority.Critical => OrderPriorityDto.High,  // Map to High
+            _ => throw new ArgumentOutOfRangeException()
+        }
+    );
+}
+```
+
+**Why this error is important:**
+- ✅ **Type safety** - Prevents runtime errors from unmapped enum values
+- ✅ **Explicit intent** - Forces you to decide how to handle missing members
+- ✅ **Documentation** - Your switch expression serves as documentation for edge cases
+- ✅ **Compile-time safety** - Catches the issue during build, not at runtime
+
+**Common patterns for handling missing members:**
+1. **Map to closest equivalent** - `Cancelled → Rejected`
+2. **Map to default value** - `Unknown → Pending`
+3. **Throw exception** - For truly invalid states
+4. **Use nullable destination** - Map to `null` if appropriate
+
+**Note:** Destination enums can have *extra* members (not present in source). Only missing destination members cause MAPPER012.
+
 ### Understanding Diagnostic Messages
 
 All constructor diagnostics provide:
@@ -651,6 +938,7 @@ Available constructors:
 **Explicit Configuration Required:**
 - ❌ 2 or more constructors exist → MAPPER008 error (must use `UseConstructor()` or `UseEmptyConstructor()`)
 - ❌ Single constructor but parameters don't match source → MAPPER007 error (must use `UseConstructor()`)
+- ❌ Enum parameter with incompatible members → MAPPER012 error (must use custom switch expression)
 - ❌ Custom transformations or calculations needed → Use `UseConstructor()`
 
 **Key Principle:** Mapgen prioritizes clarity and prevents ambiguity. When in doubt, it requires explicit configuration rather than making assumptions.

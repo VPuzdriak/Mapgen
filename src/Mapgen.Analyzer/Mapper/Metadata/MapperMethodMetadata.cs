@@ -15,6 +15,8 @@ public sealed class MapperMethodMetadata
   private readonly List<MapperDiagnostic> _diagnostics = [];
   private readonly List<IncludedMapperInfo> _includedMappers = [];
   private readonly HashSet<string> _requiredUsings = [];
+  private readonly List<EnumMappingMethodInfo> _enumMappingMethods = [];
+  private readonly Dictionary<string, string> _enumMappingMethodNames = new();
 
   public IMethodSymbol MethodSymbol { get; }
   public string ReturnTypeSyntax { get; }
@@ -35,6 +37,7 @@ public sealed class MapperMethodMetadata
   public IReadOnlyList<MapperDiagnostic> Diagnostics => _diagnostics;
   public IReadOnlyList<IncludedMapperInfo> IncludedMappers => _includedMappers;
   public IReadOnlyCollection<string> RequiredUsings => _requiredUsings;
+  public IReadOnlyList<EnumMappingMethodInfo> EnumMappingMethods => _enumMappingMethods;
 
   public MapperMethodMetadata(IMethodSymbol methodSymbol, MethodDeclarationSyntax methodDeclarationSyntax)
   {
@@ -80,5 +83,46 @@ public sealed class MapperMethodMetadata
   public void AddRequiredUsing(string ns)
   {
     _requiredUsings.Add(ns);
+  }
+
+  /// <summary>
+  /// Registers an enum mapping method. If the same mapping already exists, returns the existing method name.
+  /// </summary>
+  /// <returns>The method name to use for calling the enum mapping</returns>
+  public string RegisterEnumMappingMethod(
+    ITypeSymbol sourceEnumType,
+    ITypeSymbol destEnumType,
+    bool isSourceNullable,
+    bool isDestNullable)
+  {
+    // Create a unique key for this enum mapping combination
+    // Note: We only care about source and destination types, not their nullability
+    // A non-nullable enum always maps to the same result regardless of destination nullability
+    // C# handles the implicit conversion from non-nullable to nullable
+    var key = $"{sourceEnumType.ToDisplayString()}|{destEnumType.ToDisplayString()}";
+
+    // Check if we already have a method for this mapping
+    if (_enumMappingMethodNames.TryGetValue(key, out var existingMethodName))
+    {
+      return existingMethodName;
+    }
+
+    // Generate method name based on destination type only
+    var destTypeName = destEnumType.Name;
+    var methodName = $"MapTo{destTypeName}";
+
+    // Create and register the method info
+    // The return type nullability matches destination nullability
+    var methodInfo = new EnumMappingMethodInfo(
+      sourceEnumType,
+      destEnumType,
+      methodName,
+      isSourceNullable,
+      isDestNullable);
+
+    _enumMappingMethods.Add(methodInfo);
+    _enumMappingMethodNames[key] = methodName;
+
+    return methodName;
   }
 }
