@@ -262,15 +262,21 @@ Each strategy handles a specific type of property mapping. They are applied in o
 
 **Logic**:
 1. Check if source and destination property types match exactly
-2. Check for implicit type conversions (e.g., `int` → `long`)
+2. Check for enum-to-enum compatibility (all source members exist in destination)
 3. Check for nullable/non-nullable mismatches (reports diagnostic)
-4. Check for included mapper that can map between types
-5. If no valid mapping found, report type mismatch diagnostic
+4. Check for implicit type conversions (e.g., `int` → `long`)
+5. Check for collection mappings with compatible element types
+6. Check for included mapper that can map between types
+7. If no valid mapping found, report type mismatch diagnostic
 
 **Example**:
 ```csharp
 // Auto-mapped (exact match)
 car.Id → carDto.Id
+
+// Auto-mapped (enum with matching members)
+order.Status (OrderStatus) → orderDto.Status (OrderStatusDto)
+// Generates: Status = (OrderStatusDto)order.Status
 
 // Auto-mapped (implicit conversion)
 car.Year (short) → carDto.Year (int)
@@ -279,6 +285,13 @@ car.Year (short) → carDto.Year (int)
 car.Owner (CarOwner) → carDto.Owner (CarOwnerDto)
 // Uses _carOwnerMapper.ToDto(car.Owner)
 ```
+
+**Enum Mapping**:
+- Automatically maps enums when all source members exist in destination
+- **Maps by NAME using switch expression**, not by value (ensures semantic correctness)
+- Generates: `source.Status switch { SourceEnum.Value => DestEnum.Value, ... }`
+- Reports `MAPPER012` diagnostic if source has members not in destination
+- Supports nullable enums (`OrderStatus?` → `OrderStatusDto?`)
 
 ### CustomMappingStrategy
 
@@ -460,6 +473,13 @@ Represents a compilation error or warning with:
 | MAPPER003 | Multiple mapping methods | Error | Mapper has more than one partial method                    |
 | MAPPER004 | Type mismatch | Error | Source/destination types incompatible, no conversion exists |
 | MAPPER005 | Nullable mismatch | Warning | Mapping nullable to non-nullable (potential null reference) |
+| MAPPER006 | Required member cannot be ignored | Error | Member with `required` keyword cannot be ignored |
+| MAPPER007 | Parameterized constructor required | Error | Destination requires constructor but none selected |
+| MAPPER008 | Ambiguous constructor selection | Error | Multiple constructors available, explicit selection needed |
+| MAPPER009 | UseEmptyConstructor not possible | Error | Destination has no parameterless constructor |
+| MAPPER010 | Mapper constructor with parameters | Error | Mapper constructor must be parameterless |
+| MAPPER011 | Invalid constructor statement | Error | Mapper constructor contains invalid statements |
+| MAPPER012 | Incompatible enum mapping | Error | Source enum has members not present in destination enum (applies to properties, constructor parameters, and collections) |
 
 ### MapperDiagnosticsReporter
 

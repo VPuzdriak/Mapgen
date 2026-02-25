@@ -275,6 +275,14 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
       return;
     }
 
+    if (TryGetSourceType(methodMetadata, out var sourceType) && sourceType is not null)
+    {
+      foreach (var constructor in publicConstructors)
+      {
+        _constructorMappingStrategy.GenerateEnumMappingsForConstructor(constructor, sourceType, methodMetadata);
+      }
+    }
+
     // If user specified UseEmptyConstructor, validate it's possible
     if (hasUseEmptyConstructorCall)
     {

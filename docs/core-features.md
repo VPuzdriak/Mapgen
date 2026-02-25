@@ -60,6 +60,231 @@ public class Destination
 }
 ```
 
+### Enum Mapping
+
+Mapgen automatically maps between different enum types when they have matching member names. **Mapping is done by NAME, not by value**, ensuring semantic correctness even when enum members are in different orders.
+
+```csharp
+public enum OrderStatus
+{
+    Shipped,    // Value: 0
+    Pending,    // Value: 1
+    Delivered,  // Value: 2
+    Cancelled   // Value: 3
+}
+
+public enum OrderStatusDto
+{
+    Pending,    // Value: 0
+    Shipped,    // Value: 1
+    Reviewed,   // Value: 2 (extra member - OK!)
+    Delivered,  // Value: 3
+    Cancelled   // Value: 4
+}
+
+public class Order
+{
+    public int Id { get; set; }
+    public OrderStatus Status { get; set; }
+}
+
+public class OrderDto
+{
+    public int Id { get; set; }
+    public OrderStatusDto Status { get; set; }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    // Status enum automatically mapped BY NAME!
+    // OrderStatus.Shipped => OrderStatusDto.Shipped (not by value)
+}
+```
+
+**Generated code uses static helper methods for name-based mapping:**
+```csharp
+public OrderDto ToDto(Order order)
+{
+    return new OrderDto
+    {
+        Id = order.Id,
+        CustomerId = order.CustomerId,
+        Status = MapToOrderStatusDto(order.Status)
+    };
+}
+
+// Mapgen generates static helper methods for enum conversion:
+private static OrderStatusDto MapToOrderStatusDto(OrderStatus value) 
+  => value switch
+  {
+    OrderStatus.Shipped => OrderStatusDto.Shipped,
+    OrderStatus.Pending => OrderStatusDto.Pending,
+    OrderStatus.Delivered => OrderStatusDto.Delivered,
+    OrderStatus.Cancelled => OrderStatusDto.Cancelled,
+    _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+  };
+
+// Nullable overload is also generated automatically:
+private static OrderStatusDto? MapToOrderStatusDto(OrderStatus? value) 
+  => value.HasValue ? MapToOrderStatusDto(value.Value) : null;
+```
+
+**Note:** Mapgen uses simple type names (e.g., `OrderStatus` instead of `global::Namespace.OrderStatus`) when there are no naming conflicts, because the necessary namespaces are already included in the `using` statements at the top of the generated file. If both the source and destination enums have the same name but are in different namespaces, Mapgen automatically uses fully qualified names to avoid ambiguity.
+
+**Cross-Namespace Support:**
+
+Enums can be in different namespaces, and Mapgen automatically handles this by adding the required `using` statements to the generated file:
+
+```csharp
+// Source enum in: Mapgen.App.Models
+public enum OrderStatus { Shipped, Pending, Delivered }
+
+// Destination enum in: Mapgen.App.Dtos.Enums
+public enum OrderStatusDto { Shipped, Pending, Delivered, Reviewed }
+
+// Generated code will include both namespaces:
+using Mapgen.App.Models;
+using Mapgen.App.Dtos.Enums;
+
+// And use simple names in the helper method:
+private static OrderStatusDto MapToOrderStatusDto(OrderStatus value) 
+  => value switch
+  {
+    OrderStatus.Shipped => OrderStatusDto.Shipped,
+    OrderStatus.Pending => OrderStatusDto.Pending,
+    OrderStatus.Delivered => OrderStatusDto.Delivered,
+    _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+  };
+```
+
+**Enum Collections:**
+
+Mapgen automatically maps collections of enums by applying the name-based switch expression to each element:
+
+```csharp
+public class Order
+{
+    public List<OrderStatus> StatusHistory { get; set; }
+}
+
+public class OrderDto
+{
+    public IImmutableList<OrderStatusDto> StatusHistory { get; set; }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    // StatusHistory collection maps automatically!
+}
+```
+
+Generated code:
+```csharp
+StatusHistory = order.StatusHistory
+  .Select(orderStatus => MapToOrderStatusDto(orderStatus))
+  .ToImmutableList()
+
+// The MapToOrderStatusDto helper method is generated once and reused:
+private static OrderStatusDto MapToOrderStatusDto(OrderStatus value) 
+  => value switch
+  {
+    OrderStatus.Shipped => OrderStatusDto.Shipped,
+    OrderStatus.Pending => OrderStatusDto.Pending,
+    OrderStatus.Delivered => OrderStatusDto.Delivered,
+    OrderStatus.Cancelled => OrderStatusDto.Cancelled,
+    _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+  };
+```
+
+Supported collection types: `List<T>`, `IEnumerable<T>`, `IList<T>`, `IReadOnlyList<T>`, `IImmutableList<T>`, `ImmutableArray<T>`, arrays, and more.
+
+**Why map by name instead of value?**
+- ✅ **Semantic correctness**: `Shipped` maps to `Shipped` regardless of position
+- ✅ **Refactoring safety**: Reordering enum members doesn't break mappings
+- ✅ **Intent clarity**: Names represent meaning, values are implementation details
+- ❌ **Value-based cast would be wrong**: `(OrderStatusDto)OrderStatus.Shipped` would map `Shipped(0)` to `Pending(0)`
+
+**Requirements for automatic enum mapping:**
+- Both source and destination must be enum types
+- All source enum members must exist in destination enum (destination can have extra members)
+- Member names must match exactly (case-sensitive)
+
+**Nullable enums** are also supported:
+```csharp
+public ProductStatus? Status { get; set; }  // Nullable enum
+// Automatically maps to:
+public ProductStatusDto? Status { get; set; }
+```
+
+**When automatic mapping isn't possible:**
+
+If the source enum has members that don't exist in the destination, Mapgen reports a compile-time error (`MAPPER012`) requiring manual mapping. This ensures type safety and forces you to explicitly handle edge cases.
+
+**Why MAPPER012 occurs:**
+- Source enum has members that destination enum doesn't have
+- Mapgen cannot safely generate a mapping for values without a corresponding destination
+- Applies to properties, constructor parameters, and collection elements
+
+```csharp
+// Source has Cancelled, but destination doesn't
+public enum PaymentStatus { Pending, Approved, Rejected, Cancelled }
+public enum PaymentStatusDto { Pending, Approved, Rejected }
+
+public class PaymentRequest
+{
+    public PaymentStatus Status { get; set; }
+}
+
+public class PaymentDto
+{
+    public PaymentStatusDto Status { get; set; }
+}
+
+// ❌ This will fail with MAPPER012 error
+[Mapper]
+public partial class PaymentMapper
+{
+    public partial PaymentDto ToDto(PaymentRequest payment);
+    // ERROR: Source enum has member "Cancelled" not present in destination
+}
+```
+
+**Fix - Use MapMember() for explicit handling:**
+```csharp
+[Mapper]
+public partial class PaymentMapper
+{
+    public partial PaymentDto ToDto(PaymentRequest payment);
+    
+    public PaymentMapper()
+    {
+        // Manual mapping required for safety
+        MapMember(dest => dest.Status, src => src.Status switch
+        {
+            PaymentStatus.Pending => PaymentStatusDto.Pending,
+            PaymentStatus.Approved => PaymentStatusDto.Approved,
+            PaymentStatus.Rejected => PaymentStatusDto.Rejected,
+            PaymentStatus.Cancelled => PaymentStatusDto.Rejected, // Explicit handling
+            _ => throw new ArgumentOutOfRangeException()
+        });
+    }
+}
+```
+
+**Important notes:**
+- ✅ Destination can have extra members (e.g., `Reviewed` in earlier examples) - this is OK
+- ❌ Source cannot have extra members - this triggers MAPPER012
+- ✅ Error caught at compile-time, not runtime
+- ✅ Forces explicit decision on how to handle missing mappings
+
+> **See also:** [MAPPER012 Diagnostic](advanced-usage.md#mapper012-incompatible-enum-mapping) in Advanced Usage for more details, including enum mappings in constructor parameters and collections.
+
+For advanced enum transformations (enum to string, formatting, custom logic), see [Advanced Usage](advanced-usage.md#type-conversions).
+
 ## Field Mapping
 
 Mapgen supports mapping public fields in addition to properties. This is particularly useful when working with DTOs, data structures, or legacy code that uses fields.

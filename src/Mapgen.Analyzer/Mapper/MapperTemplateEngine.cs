@@ -174,7 +174,7 @@ public sealed class MapperTemplateEngine
     var builder = new StringBuilder();
 
     // Get constructor parameter names (from the ConstructorInfo)
-    var constructorParamNames = new System.Collections.Generic.HashSet<string>(
+    var constructorParamNames = new HashSet<string>(
       methodMetadata.ConstructorInfo.Parameters.Select(p => p.Name),
       System.StringComparer.OrdinalIgnoreCase);
 
@@ -242,6 +242,12 @@ public sealed class MapperTemplateEngine
 
     var builder = new StringBuilder();
 
+    var enumMappingMethods = GenerateEnumMappingMethods(_configMetadata.Method);
+    if (!string.IsNullOrEmpty(enumMappingMethods))
+    {
+      builder.AppendLine(enumMappingMethods + "\n");
+    }
+
     var includeMappersMethod = GenerateIncludeMappersMethod();
     builder.AppendLine(includeMappersMethod + "\n");
 
@@ -261,6 +267,98 @@ public sealed class MapperTemplateEngine
     builder.AppendLine(ignoreMemberMethod);
 
     return builder.ToString();
+  }
+
+  private string GenerateEnumMappingMethods(MapperMethodMetadata methodMetadata)
+  {
+    if (methodMetadata.EnumMappingMethods.Count == 0)
+    {
+      return string.Empty;
+    }
+
+    var builder = new StringBuilder();
+
+    foreach (var enumMethod in methodMetadata.EnumMappingMethods)
+    {
+      if (builder.Length > 0)
+      {
+        builder.AppendLine().AppendLine();
+      }
+
+      var methods = GenerateEnumMappingMethod(enumMethod);
+      builder.Append(methods);
+    }
+
+    return builder.ToString();
+  }
+
+  private string GenerateEnumMappingMethod(EnumMappingMethodInfo methodInfo)
+  {
+    var sourceType = methodInfo.SourceEnumType;
+    var destType = methodInfo.DestEnumType;
+    var methodName = methodInfo.MethodName;
+
+    // Determine if we need fully qualified names
+    var hasNameConflict = sourceType.Name == destType.Name;
+
+    var sourceTypeName = hasNameConflict
+      ? sourceType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+      : sourceType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+
+    var destTypeName = hasNameConflict
+      ? destType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+      : destType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+
+    var builder = new StringBuilder();
+
+    // Generate non-nullable method (always)
+    var nonNullableMethod = GenerateNonNullableEnumMappingMethod(
+      methodInfo,
+      sourceTypeName,
+      destTypeName,
+      methodName);
+    builder.Append(nonNullableMethod);
+
+    // Generate nullable method (always)
+    builder.AppendLine().AppendLine();
+    var nullableMethod = GenerateNullableEnumMappingMethod(sourceTypeName,
+      destTypeName,
+      methodName);
+    builder.Append(nullableMethod);
+
+    return builder.ToString();
+  }
+
+  private string GenerateNonNullableEnumMappingMethod(
+    EnumMappingMethodInfo methodInfo,
+    string sourceTypeName,
+    string destTypeName,
+    string methodName)
+  {
+    // Create a modified methodInfo for non-nullable version
+    var nonNullableMethodInfo = new EnumMappingMethodInfo(
+      methodInfo.SourceEnumType,
+      methodInfo.DestEnumType,
+      methodName,
+      isSourceNullable: false,
+      isDestNullable: false);
+
+    // Generate the switch expression body
+    var switchBody = EnumMappingHelpers.GenerateEnumMappingMethodBody(nonNullableMethodInfo);
+
+    return $$"""
+                 private static {{destTypeName}} {{methodName}}({{sourceTypeName}} value) 
+                   => {{switchBody}};
+             """;
+  }
+
+  private string GenerateNullableEnumMappingMethod(string sourceTypeName, string destTypeName, string methodName)
+  {
+    // Generate nullable method that calls the non-nullable version
+    return $$"""
+                 private static {{destTypeName}}? {{methodName}}({{sourceTypeName}}? value) 
+                   => value.HasValue ? {{methodName}}(value.Value) : null;
+             """;
   }
 
   private string GenerateIncludeMappersMethod()
