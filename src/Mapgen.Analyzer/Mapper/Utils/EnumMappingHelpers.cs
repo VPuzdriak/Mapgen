@@ -127,7 +127,7 @@ internal static class EnumMappingHelpers
       methodMetadata.AddRequiredUsing(namespaceName);
     }
   }
-  
+
   /// <summary>
   /// Unwraps a nullable type to get the underlying type.
   /// </summary>

@@ -19,7 +19,7 @@ public sealed class OrderDto
     IsVipOrder = orderPriority == OrderPriorityDto.High;
     StatusHistory = [];
   }
-  
+
   public OrderDto(OrderPriorityDto orderPriority, int id, int customerId)
   {
     Id = id;
