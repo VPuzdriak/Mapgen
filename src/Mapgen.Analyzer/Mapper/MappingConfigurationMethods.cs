@@ -8,5 +8,6 @@
     public const string IncludeMappersMethodName = "IncludeMappers";
     public const string UseConstructorMethodName = "UseConstructor";
     public const string UseEmptyConstructorMethodName = "UseEmptyConstructor";
+    public const string MapEnumMethodName = "MapEnum";
   }
 }

@@ -30,6 +30,8 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
 
     ParseIncludedMappers(classNode, methodMetadata, ct);
 
+    ParseAndProcessEnumMappings(classNode, methodMetadata, ct);
+
     AddConstructorArgumentsMappings(classNode, methodMetadata, ct);
     AddIgnoreMappings(classNode, methodMetadata, ct);
     AddCustomMappings(classNode, methodMetadata, ct);
@@ -64,6 +66,42 @@ public sealed class MapperMethodTransformer(SemanticModel semanticModel)
     foreach (var includedMapper in includedMappers)
     {
       methodMetadata.AddIncludedMapper(includedMapper);
+    }
+  }
+
+  private void ParseAndProcessEnumMappings(SyntaxNode classNode, MapperMethodMetadata methodMetadata, CancellationToken ct)
+  {
+    var enumDeclarations = _mappingParser.ParseMapEnumDeclarations(classNode, ct);
+
+    foreach (var declaration in enumDeclarations)
+    {
+      if (ct.IsCancellationRequested)
+      {
+        break;
+      }
+
+      // Validate that both types are enums
+      var sourceType = declaration.SourceEnumType;
+      var destType = declaration.DestEnumType;
+
+      // Check enum compatibility
+      if (TypeCompatibilityChecker.AreEnumsCompatible(sourceType, destType, out var missingMembers))
+      {
+        // Enums are compatible - register the mapping
+        EnumMappingHelpers.RegisterEnumMapping(sourceType, destType, methodMetadata);
+        methodMetadata.AddEnumMappingDeclaration(declaration);
+      }
+      else if (missingMembers.Any())
+      {
+        // Enums are incompatible - add diagnostic
+        var diagnostic = MapperDiagnostic.IncompatibleStandaloneEnumMapping(
+          declaration.Location,
+          sourceType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+          destType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+          missingMembers);
+
+        methodMetadata.AddDiagnostic(diagnostic);
+      }
     }
   }
 

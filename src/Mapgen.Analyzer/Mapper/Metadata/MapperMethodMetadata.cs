@@ -16,7 +16,8 @@ public sealed class MapperMethodMetadata
   private readonly List<IncludedMapperInfo> _includedMappers = [];
   private readonly HashSet<string> _requiredUsings = [];
   private readonly List<EnumMappingMethodInfo> _enumMappingMethods = [];
-  private readonly Dictionary<string, string> _enumMappingMethodNames = new();
+  private readonly Dictionary<string, string> _enumMappingMethodNames = [];
+  private readonly List<EnumMappingDeclaration> _enumMappingDeclarations = [];
 
   public IMethodSymbol MethodSymbol { get; }
   public string ReturnTypeSyntax { get; }
@@ -38,6 +39,7 @@ public sealed class MapperMethodMetadata
   public IReadOnlyList<IncludedMapperInfo> IncludedMappers => _includedMappers;
   public IReadOnlyCollection<string> RequiredUsings => _requiredUsings;
   public IReadOnlyList<EnumMappingMethodInfo> EnumMappingMethods => _enumMappingMethods;
+  public IReadOnlyList<EnumMappingDeclaration> EnumMappingDeclarations => _enumMappingDeclarations;
 
   public MapperMethodMetadata(IMethodSymbol methodSymbol, MethodDeclarationSyntax methodDeclarationSyntax)
   {
@@ -83,6 +85,11 @@ public sealed class MapperMethodMetadata
   public void AddRequiredUsing(string ns)
   {
     _requiredUsings.Add(ns);
+  }
+
+  public void AddEnumMappingDeclaration(EnumMappingDeclaration declaration)
+  {
+    _enumMappingDeclarations.Add(declaration);
   }
 
   /// <summary>

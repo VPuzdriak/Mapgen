@@ -1,6 +1,6 @@
 namespace Mapgen.Tests.Unit.Enums.Models.Contracts.Enums;
 
-public enum CustomerStatus
+public enum CustomerStatusDto
 {
   Regular,
   Vip,

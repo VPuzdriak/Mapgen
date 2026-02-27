@@ -266,7 +266,10 @@ public sealed class MapperTemplateEngine
     builder.AppendLine(mapCollectionMethod + "\n");
 
     var ignoreMemberMethod = GenerateIgnoreMemberMethod(_configMetadata.Method);
-    builder.AppendLine(ignoreMemberMethod);
+    builder.AppendLine(ignoreMemberMethod + "\n");
+
+    var mapEnumMethod = GenerateMapEnumMethod();
+    builder.AppendLine(mapEnumMethod);
 
     return builder.ToString();
   }
@@ -379,7 +382,7 @@ public sealed class MapperTemplateEngine
 
     // Get all public constructors with parameters
     var constructorsWithParams = destinationType.InstanceConstructors
-      .Where(c => c.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public && c.Parameters.Length > 0)
+      .Where(c => c.DeclaredAccessibility == Accessibility.Public && c.Parameters.Length > 0)
       .OrderBy(c => c.Parameters.Length)
       .ToList();
 
@@ -616,6 +619,17 @@ public sealed class MapperTemplateEngine
                  private void {{MappingConfigurationMethods.IgnoreMemberMethodName}}<TDestinationMember>(
                    Expression<Func<{{destinationType}}, TDestinationMember>> destinationMember) {
                    // Mapgen will use this method as mapping configuration.
+                 }
+             """;
+  }
+
+  private string GenerateMapEnumMethod()
+  {
+    return $$"""
+                 private void {{MappingConfigurationMethods.MapEnumMethodName}}<TSourceEnum, TDestinationEnum>()
+                   where TSourceEnum : struct, Enum
+                   where TDestinationEnum : struct, Enum {
+                   // Mapgen will use this method to generate enum mapping methods.
                  }
              """;
   }

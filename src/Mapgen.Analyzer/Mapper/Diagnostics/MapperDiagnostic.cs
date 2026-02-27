@@ -241,4 +241,22 @@ public sealed class MapperDiagnostic
       location: location,
       mapperClassName);
   }
+
+  public static MapperDiagnostic IncompatibleStandaloneEnumMapping(
+    Location? location,
+    string sourceEnumType,
+    string destEnumType,
+    IReadOnlyList<string> missingMembers)
+  {
+    return new MapperDiagnostic(
+      id: DiagnosticIds.IncompatibleStandaloneEnumMapping,
+      title: "Incompatible enum mapping",
+      messageFormat:
+      "Enum type \"{0}\" cannot be automatically mapped to \"{1}\" because source enum has members not present in destination: {2}. Remove the MapEnum() call and make mapping manually or add missing members to the destination enum.",
+      severity: DiagnosticSeverity.Error,
+      location: location,
+      sourceEnumType,
+      destEnumType,
+      string.Join(", ", missingMembers.Select(m => $"\"{m}\"")));
+  }
 }

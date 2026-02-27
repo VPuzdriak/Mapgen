@@ -1,11 +1,7 @@
 ﻿using FluentAssertions;
 
-using Mapgen.Tests.Unit.Enums.Models.Contracts;
 using Mapgen.Tests.Unit.Enums.Models.Contracts.Enums;
 using Mapgen.Tests.Unit.Enums.Models.Entity;
-
-using CustomerStatus = Mapgen.Tests.Unit.Enums.Models.Entity.CustomerStatus;
-using OrderPriority = Mapgen.Tests.Unit.Enums.Models.Entity.OrderPriority;
 
 namespace Mapgen.Tests.Unit.Enums;
 
@@ -13,6 +9,54 @@ public class EnumMappingCases
 {
   [Fact]
   public void When_EnumProperties_ShouldMapCorrectly()
+  {
+    // Arrange
+    var bill = new Bill
+    {
+      Id = 1001,
+      Status = BillStatus.Paid,
+      PaymentMethod = PaymentType.CreditCard,
+      StatusTransitions = [BillStatus.Draft, BillStatus.Sent, BillStatus.Paid]
+    };
+
+    var mapper = new BillMapper();
+
+    // Act
+    var result = mapper.ToDto(bill);
+
+    // Assert
+    result.Id.Should().Be(bill.Id);
+    result.Status.Should().Be(BillStatusDto.Paid);
+    result.PaymentMethod.Should().Be(PaymentTypeDto.CreditCard);
+    result.StatusTransitions.Should().BeEquivalentTo([BillStatusDto.Draft, BillStatusDto.Sent, BillStatusDto.Paid]);
+  }
+
+  [Fact]
+  public void When_EnumFields_ShouldMapCorrectly()
+  {
+    // Arrange
+    var item = new Item
+    {
+      Id = 42,
+      Name = "Laptop",
+      Category = ItemCategory.Electronics,
+      Availability = ItemAvailability.InStock
+    };
+
+    var mapper = new ItemMapper();
+
+    // Act
+    var result = mapper.ToDto(item);
+
+    // Assert
+    result.Id.Should().Be(item.Id);
+    result.Name.Should().Be(item.Name);
+    result.Category.Should().Be(ItemCategoryDto.Electronics);
+    result.Availability.Should().Be(ItemAvailabilityDto.InStock);
+  }
+
+  [Fact]
+  public void When_CtorArgumentsAreEnum_ShouldMapCorrectly()
   {
     // Arrange
     var order = new Order

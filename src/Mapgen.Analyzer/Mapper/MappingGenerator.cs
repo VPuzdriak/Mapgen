@@ -100,7 +100,8 @@ namespace Mapgen.Analyzer.Mapper
         var allowedMethods = new[]
         {
           MappingConfigurationMethods.MapMemberMethodName, MappingConfigurationMethods.MapCollectionMethodName, MappingConfigurationMethods.IgnoreMemberMethodName,
-          MappingConfigurationMethods.IncludeMappersMethodName, MappingConfigurationMethods.UseConstructorMethodName, MappingConfigurationMethods.UseEmptyConstructorMethodName
+          MappingConfigurationMethods.IncludeMappersMethodName, MappingConfigurationMethods.UseConstructorMethodName, MappingConfigurationMethods.UseEmptyConstructorMethodName,
+          MappingConfigurationMethods.MapEnumMethodName
         };
 
         foreach (var statement in constructor.Body.Statements)

@@ -3,8 +3,6 @@ using Mapgen.Tests.Unit.Enums.Models.Contracts;
 using Mapgen.Tests.Unit.Enums.Models.Contracts.Enums;
 using Mapgen.Tests.Unit.Enums.Models.Entity;
 
-using CustomerStatusContract = Mapgen.Tests.Unit.Enums.Models.Contracts.Enums.CustomerStatus;
-
 namespace Mapgen.Tests.Unit.Enums;
 
 [Mapper]
@@ -14,21 +12,19 @@ public partial class OrderMapper
 
   public OrderMapper()
   {
+    /*
+     * CustomerStatusDto is not mapped from source member, so we need to map it manually
+     * Or we can use MapEnum to map it automatically
+     * This generates MapToCustomerStatusDto method which maps CustomerStatus to CustomerStatusDto
+     */
+    MapEnum<CustomerStatus, CustomerStatusDto>();
+
     UseConstructor(
       (src, customer) => src.Id,
       (src, customer) => src.CustomerId,
+      // OrderPriority is a ctor argument and exists in source, so MapToOrderPriorityDto is generated automatically
       (src, customer) => MapToOrderPriorityDto(src.OrderPriority),
       (src, customer) => MapToCustomerStatusDto(customer.Status)
     );
-  }
-
-  private CustomerStatusContract MapToCustomerStatusDto(Models.Entity.CustomerStatus customerStatus)
-  {
-    return customerStatus switch
-    {
-      Models.Entity.CustomerStatus.Regular => CustomerStatusContract.Regular,
-      Models.Entity.CustomerStatus.Vip => CustomerStatusContract.Vip,
-      _ => CustomerStatusContract.Regular
-    };
   }
 }

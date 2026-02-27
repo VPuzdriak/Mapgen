@@ -17,6 +17,7 @@ internal static class DiagnosticIds
   public const string MapperConstructorWithParameters = "MAPPER010";
   public const string InvalidConstructorStatement = "MAPPER011";
   public const string IncompatibleEnumMapping = "MAPPER012";
+  public const string IncompatibleStandaloneEnumMapping = "MAPPER013";
 
   public const string Category = "Mapper";
 }

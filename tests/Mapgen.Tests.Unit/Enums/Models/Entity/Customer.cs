@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Mapgen.Tests.Unit.Enums.Models.Entity;
 
 public class Customer
