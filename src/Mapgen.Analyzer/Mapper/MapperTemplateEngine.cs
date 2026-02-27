@@ -6,6 +6,8 @@ using Mapgen.Analyzer.Mapper.MappingDescriptors;
 using Mapgen.Analyzer.Mapper.Metadata;
 using Mapgen.Analyzer.Mapper.Utils;
 
+using Microsoft.CodeAnalysis;
+
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Mapgen.Analyzer.Mapper;
@@ -391,11 +393,36 @@ public sealed class MapperTemplateEngine
 
       var sourceParamTypes = string.Join(", ", methodMetadata.Parameters.Select(p => p.TypeSyntax));
 
+      // Collect all members from source parameters to detect type name conflicts
+      var sourceMembers = new List<MemberInfo>();
+      foreach (var sourceParam in methodMetadata.Parameters)
+      {
+        if (sourceParam.Symbol.Type is INamedTypeSymbol sourceType)
+        {
+          sourceMembers.AddRange(sourceType.GetAllMembers());
+        }
+      }
+
+      // Generate parameters with conflict detection
       var parameters = new List<string>();
       foreach (var ctorParam in constructor.Parameters)
       {
-        var paramType = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         var paramName = ctorParam.Name;
+        var parmTypeName = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var paramFullTypeName = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
+        // Check if constructor parameter type conflicts with any source member type
+        var hasConflict = sourceMembers.Any(member =>
+        {
+          var sourceMemberTypeName = member.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+          var sourceMemberFullTypeName = member.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
+          // A conflict occurs if the simple type names are the same but the full type names are different (indicating a naming collision)
+          return sourceMemberTypeName == parmTypeName && sourceMemberFullTypeName != paramFullTypeName;
+        });
+
+        var paramType = hasConflict ? paramFullTypeName : parmTypeName;
+
         parameters.Add($"Expression<Func<{sourceParamTypes}, {paramType}>> {paramName}");
       }
 

@@ -4,6 +4,9 @@ using Mapgen.Tests.Unit.Enums.Models.Contracts;
 using Mapgen.Tests.Unit.Enums.Models.Contracts.Enums;
 using Mapgen.Tests.Unit.Enums.Models.Entity;
 
+using CustomerStatus = Mapgen.Tests.Unit.Enums.Models.Entity.CustomerStatus;
+using OrderPriority = Mapgen.Tests.Unit.Enums.Models.Entity.OrderPriority;
+
 namespace Mapgen.Tests.Unit.Enums;
 
 public class EnumMappingCases
@@ -20,10 +23,13 @@ public class EnumMappingCases
       CurrentStatus = OrderStatus.Delivered,
       StatusHistory = [OrderStatus.Pending, OrderStatus.Shipped, OrderStatus.Delivered]
     };
+
+    var customer = new Customer { Id = 1, Status = CustomerStatus.Vip };
+
     var mapper = new OrderMapper();
 
     // Act
-    var result = mapper.ToDto(order);
+    var result = mapper.ToDto(order, customer);
 
     // Assert
     result.Id.Should().Be(order.Id);
