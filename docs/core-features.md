@@ -281,7 +281,9 @@ public partial class PaymentMapper
 - ✅ Error caught at compile-time, not runtime
 - ✅ Forces explicit decision on how to handle missing mappings
 
-> **See also:** [MAPPER012 Diagnostic](advanced-usage.md#mapper012-incompatible-enum-mapping) in Advanced Usage for more details, including enum mappings in constructor parameters and collections.
+> **See also:** 
+> - [MAPPER012 Diagnostic](advanced-usage.md#mapper012-incompatible-enum-mapping) in Advanced Usage for more details, including enum mappings in constructor parameters and collections.
+> - [Explicit Enum Mapping with MapEnum](advanced-usage.md#explicit-enum-mapping-with-mapenum) for scenarios where automatic enum mapping doesn't apply or when you need explicit control over helper method generation.
 
 For advanced enum transformations (enum to string, formatting, custom logic), see [Advanced Usage](advanced-usage.md#type-conversions).
 

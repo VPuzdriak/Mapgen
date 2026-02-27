@@ -135,13 +135,18 @@ MapperMethodTransformer.Transform()
           ↓
 Apply mapping strategies in order:
   1. ParseIncludedMappers
-  2. AddIgnoreMappings
-  3. AddCustomMappings
-  4. AddCollectionMappings
-  5. AddDirectMappings
-  6. AddUnmappedPropertyDiagnostics
+  2. ParseEnumDeclarations (MapEnum calls)
+  3. AddIgnoreMappings
+  4. AddCustomMappings
+  5. AddCollectionMappings
+  6. AddDirectMappings (includes automatic enum detection)
+  7. AddUnmappedPropertyDiagnostics
           ↓
-MapperMethodMetadata (with mappings & diagnostics)
+Process Constructor Info (if UseConstructor)
+  - Detect enum parameters
+  - Generate enum helper methods
+          ↓
+MapperMethodMetadata (with mappings, enum helpers & diagnostics)
 ```
 
 ### 3. Generation Phase
@@ -151,6 +156,10 @@ MappingConfigurationMetadata
 MapperDiagnosticsReporter.Report()
           ↓
 MapperTemplateEngine.GenerateMapperClass()
+  - Generate mapper fields
+  - Generate mapping methods
+  - Generate enum helper methods (from EnumMappingMethods)
+  - Generate configuration helper methods (MapMember, etc.)
           ↓
 Generated source code added to compilation
 ```
@@ -194,19 +203,36 @@ Generated source code added to compilation
 
 ### MappingParser
 
-**Purpose**: Parse mapper dependencies from constructor
+**Purpose**: Parse mapper configuration from constructor
 
 **Responsibilities**:
 - Find `IncludeMappers()` calls in constructor
 - Extract included mapper types from collection expressions
 - Build `IncludedMapperInfo` for each dependency
+- Find `MapEnum<TSource, TDest>()` declarations
+- Extract enum type arguments and build `EnumMappingDeclaration` for each
 
-**Example**:
+**Example (IncludeMappers)**:
 ```csharp
 public CarOwnerMapper() {
     IncludeMappers([new CarMapper(), new DriverMapper()]);
 }
 ```
+
+**Example (MapEnum)**:
+```csharp
+public OrderMapper() {
+    MapEnum<CustomerStatus, CustomerStatusDto>();
+    MapEnum<OrderPriority, OrderPriorityDto>();
+}
+```
+
+**MapEnum Processing**:
+1. Searches for `MapEnum` invocations in constructor
+2. Validates exactly 2 type arguments: `<TSourceEnum, TDestEnum>`
+3. Extracts type symbols for both enums
+4. Creates `EnumMappingDeclaration` with source type, destination type, and location
+5. Stores declarations in `MapperMethodMetadata` for later processing
 
 ### MapperTemplateEngine
 
@@ -276,7 +302,7 @@ car.Id → carDto.Id
 
 // Auto-mapped (enum with matching members)
 order.Status (OrderStatus) → orderDto.Status (OrderStatusDto)
-// Generates: Status = (OrderStatusDto)order.Status
+// Generates: Status = MapToOrderStatusDto(order.Status)
 
 // Auto-mapped (implicit conversion)
 car.Year (short) → carDto.Year (int)
@@ -286,12 +312,59 @@ car.Owner (CarOwner) → carDto.Owner (CarOwnerDto)
 // Uses _carOwnerMapper.ToDto(car.Owner)
 ```
 
-**Enum Mapping**:
-- Automatically maps enums when all source members exist in destination
-- **Maps by NAME using switch expression**, not by value (ensures semantic correctness)
-- Generates: `source.Status switch { SourceEnum.Value => DestEnum.Value, ... }`
+**Enum Mapping Details**:
+
+Mapgen provides comprehensive enum mapping support with compile-time validation:
+
+**Automatic Detection**:
+- Detects when source and destination properties are both enums
+- Analyzes enum members to ensure compatibility
+- Generates helper methods automatically when needed
+
+**Name-Based Mapping**:
+- Maps enums **by member NAME** using switch expressions, not by numeric value
+- Ensures semantic correctness (prevents mapping `Status.Active = 1` to `StatusDto.Pending = 1`)
+- Case-sensitive member name matching
+
+**Helper Method Generation**:
+```csharp
+// For property: OrderStatus → OrderStatusDto
+private static OrderStatusDto MapToOrderStatusDto(OrderStatus value) 
+    => value switch
+    {
+        OrderStatus.Pending => OrderStatusDto.Pending,
+        OrderStatus.Shipped => OrderStatusDto.Shipped,
+        OrderStatus.Delivered => OrderStatusDto.Delivered,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+    };
+```
+
+**Nullable Support**:
+- Automatically generates nullable overloads
+- `OrderStatus?` → `OrderStatusDto?` handled transparently
+```csharp
+private static OrderStatusDto? MapToOrderStatusDto(OrderStatus? value) 
+    => value.HasValue ? MapToOrderStatusDto(value.Value) : null;
+```
+
+**Collection Support**:
+- Enum collections automatically mapped: `List<OrderStatus>` → `List<OrderStatusDto>`
+- Uses LINQ: `source.StatusHistory.Select(MapToOrderStatusDto).ToList()`
+
+**Constructor Parameter Support**:
+- Enum constructor parameters automatically mapped
+- Helper methods available for both automatic and explicit `UseConstructor()` scenarios
+
+**Validation**:
 - Reports `MAPPER012` diagnostic if source has members not in destination
-- Supports nullable enums (`OrderStatus?` → `OrderStatusDto?`)
+- Requires all source enum values to have corresponding destination values
+- Destination enum can have extra members (not an error)
+
+**MapEnum Declarations**:
+- `MapEnum<TSource, TDest>()` explicitly declares enum mappings
+- Used when enum doesn't match any source property name
+- Makes helper methods available for use in `UseConstructor()` or `MapMember()`
+- Processes same validation as automatic enum detection
 
 ### CustomMappingStrategy
 
@@ -384,6 +457,201 @@ IgnoreMember(dto => dto.CalculatedField);
 // Result: No mapping generated, no diagnostic reported
 ```
 
+## Enum Mapping Pipeline
+
+Enum mapping in Mapgen involves multiple stages from detection to code generation:
+
+### 1. Enum Declaration Detection
+
+**Sources of Enum Mappings**:
+
+**A. Explicit MapEnum Declarations**:
+```csharp
+public OrderMapper() {
+    MapEnum<CustomerStatus, CustomerStatusDto>();
+}
+```
+- Parsed in `MappingParser.ParseMapEnumDeclarations()`
+- Creates `EnumMappingDeclaration` with source/dest types
+- Stored in `MapperMethodMetadata.EnumMappingDeclarations`
+
+**B. Automatic Constructor Detection**:
+```csharp
+// Constructor parameter requires enum mapping
+public OrderDto(int id, OrderPriorityDto priority) { }
+```
+- Detected in `MapperMethodTransformer` during constructor analysis
+- When constructor parameter type differs from source property type
+- Both must be enums for automatic helper generation
+
+**C. Automatic Property Detection**:
+```csharp
+// Property-to-property enum mapping
+public class OrderDto {
+    public OrderStatusDto Status { get; set; }
+}
+```
+- Detected in `DirectMappingStrategy`
+- When source and destination properties are both enums
+- Property names must match (case-insensitive)
+
+### 2. Enum Compatibility Validation
+
+**Validation Process** (in `EnumMappingHelpers`):
+1. Extract all member names from source enum
+2. Extract all member names from destination enum
+3. Check if all source members exist in destination
+4. **Allowed**: Destination has extra members not in source
+5. **Error**: Source has members not in destination → `MAPPER012`
+
+**Example Validation**:
+```csharp
+// Source enum
+public enum OrderStatus { Pending, Shipped, Delivered }
+
+// ✅ Valid - destination has extra member
+public enum OrderStatusDto { Pending, Shipped, Delivered, Returned }
+
+// ❌ Invalid - source has "Cancelled" not in destination
+public enum OrderStatusDto2 { Pending, Shipped, Delivered }
+```
+
+### 3. Helper Method Generation
+
+**EnumMappingMethodInfo Creation**:
+- For each enum pair, create `EnumMappingMethodInfo`
+- Method name: `MapTo{DestinationEnumName}`
+- Store in `MapperMethodMetadata.EnumMappingMethods`
+
+**Code Generation** (in `MapperTemplateEngine`):
+```csharp
+private string GenerateEnumMappingMethod(EnumMappingMethodInfo methodInfo)
+{
+    // Generate non-nullable version
+    private static DestEnum MapToDestEnum(SourceEnum value) 
+        => value switch
+        {
+            SourceEnum.Member1 => DestEnum.Member1,
+            SourceEnum.Member2 => DestEnum.Member2,
+            _ => throw new ArgumentOutOfRangeException(...)
+        };
+    
+    // Generate nullable version
+    private static DestEnum? MapToDestEnum(SourceEnum? value) 
+        => value.HasValue ? MapToDestEnum(value.Value) : null;
+}
+```
+
+### 4. Helper Method Usage
+
+**In Constructor Mapping**:
+```csharp
+return new OrderDto(
+    order.Id,
+    MapToOrderPriorityDto(order.Priority)  // Helper method call
+);
+```
+
+**In Property Mapping**:
+```csharp
+return new OrderDto {
+    Status = MapToOrderStatusDto(order.Status),  // Helper method call
+    // ...
+};
+```
+
+**In Collection Mapping**:
+```csharp
+StatusHistory = order.StatusHistory
+    .Select(MapToOrderStatusDto)  // Helper as method group
+    .ToList()
+```
+
+**In Custom Expressions**:
+```csharp
+MapMember(dto => dto.StatusDisplay, 
+    order => $"Status: {MapToOrderStatusDto(order.Status)}");
+```
+
+### 5. Deduplication
+
+Mapgen ensures each enum pair generates exactly one set of helper methods:
+
+1. Collect all enum pairs from explicit declarations
+2. Collect all enum pairs from automatic detection
+3. Deduplicate by source/destination type combination
+4. Generate one helper method set per unique pair
+
+**Example**:
+```csharp
+public OrderMapper() {
+    // Explicit declaration
+    MapEnum<OrderStatus, OrderStatusDto>();
+    
+    UseConstructor(
+        (order, customer) => order.Id,
+        // Would auto-detect OrderStatus → OrderStatusDto
+        (order, customer) => MapToOrderStatusDto(order.Status)
+    );
+}
+// Result: Only ONE set of MapToOrderStatusDto methods generated
+```
+
+### 6. Error Reporting
+
+**MAPPER012: Incompatible Enum Mapping**:
+- Reported when source enum has members not in destination
+- Includes list of missing members in error message
+- Suggests using `MapMember()` for custom handling
+
+**Error Message Format**:
+```
+error MAPPER012: Enum type "OrderStatus" cannot be automatically mapped 
+to "OrderStatusDto" because source enum has members not present in 
+destination: "Cancelled". Remove the MapEnum() call and make mapping 
+manually or add missing members to the destination enum.
+```
+
+### Pipeline Summary
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           1. Detection Phase                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐  │
+│  │ MapEnum()    │  │ Constructor  │  │ Property Names  │  │
+│  │ Declarations │  │ Parameters   │  │ Match           │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────┬────────┘  │
+│         └──────────────────┼────────────────────┘           │
+└────────────────────────────┼────────────────────────────────┘
+                             ▼
+                ┌────────────────────────┐
+                │  2. Validation Phase   │
+                │  - Check members       │
+                │  - Report MAPPER012    │
+                └───────────┬────────────┘
+                            ▼
+                ┌────────────────────────┐
+                │  3. Generation Phase   │
+                │  - Create method info  │
+                │  - Deduplicate         │
+                └───────────┬────────────┘
+                            ▼
+                ┌────────────────────────┐
+                │  4. Code Gen Phase     │
+                │  - Generate helpers    │
+                │  - Non-nullable        │
+                │  - Nullable            │
+                └───────────┬────────────┘
+                            ▼
+                ┌────────────────────────┐
+                │  5. Usage in Mappings  │
+                │  - Constructor args    │
+                │  - Property mapping    │
+                │  - Collections         │
+                │  - Custom expressions  │
+                └────────────────────────┘
+```
+
 ## Code Generation
 
 ### Two Generators
@@ -441,6 +709,12 @@ private void MapMember<TDestinationMember>(
   Func<Car, TDestinationMember> sourceFunc) {
   // Mapgen will use this method as mapping configuration.
 }
+
+private void MapEnum<TSourceEnum, TDestinationEnum>()
+  where TSourceEnum : struct, Enum
+  where TDestinationEnum : struct, Enum {
+  // Mapgen will use this method to generate enum mapping methods.
+}
 ```
 
 **Multiple Overloads**: The generator creates overloads for different parameter counts:
@@ -451,6 +725,28 @@ MapMember(dto => dto.Name, car => car.Model)
 // 2 parameters
 MapMember(dto => dto.Name, (car, driver) => car.Model + " driven by " + driver.Name)
 ```
+
+**Enum Mapping Helper Methods**: The generator creates static helper methods for enum conversions:
+```csharp
+// Non-nullable overload
+private static OrderStatusDto MapToOrderStatusDto(OrderStatus value) 
+    => value switch
+    {
+        OrderStatus.Pending => OrderStatusDto.Pending,
+        OrderStatus.Shipped => OrderStatusDto.Shipped,
+        OrderStatus.Delivered => OrderStatusDto.Delivered,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+    };
+
+// Nullable overload
+private static OrderStatusDto? MapToOrderStatusDto(OrderStatus? value) 
+    => value.HasValue ? MapToOrderStatusDto(value.Value) : null;
+```
+
+**When Enum Helpers are Generated**:
+1. **Automatic**: When constructor parameters or properties require enum mapping
+2. **Explicit**: When `MapEnum<TSource, TDest>()` is called in constructor
+3. **Naming**: Helper methods use pattern `MapTo{DestinationEnumName}`
 
 ## Diagnostics System
 
@@ -509,6 +805,28 @@ Metadata for single mapping method:
 - Mappings (list of descriptors)
 - Diagnostics (errors/warnings)
 - Included mappers
+- Enum mapping declarations
+- Enum mapping methods (generated helper methods)
+
+### EnumMappingDeclaration
+Represents an explicit `MapEnum<TSource, TDest>()` call in mapper constructor:
+- **SourceEnumType**: Source enum type symbol
+- **DestEnumType**: Destination enum type symbol  
+- **Location**: Source code location for error reporting
+
+Used to generate enum mapping helper methods that can be used in constructor parameters and custom mappings.
+
+### EnumMappingMethodInfo
+Metadata for a generated enum mapping helper method:
+- **SourceEnumType**: Source enum type
+- **DestEnumType**: Destination enum type
+- **MethodName**: Generated method name (e.g., `MapToOrderStatusDto`)
+- **IsSourceNullable**: Whether source is nullable
+- **IsDestNullable**: Whether destination is nullable
+
+Mapgen generates two overloads for each enum mapping:
+1. Non-nullable: `TDest MethodName(TSource value)`
+2. Nullable: `TDest? MethodName(TSource? value)`
 
 ### Mapping Descriptors
 
@@ -524,6 +842,10 @@ Metadata for single mapping method:
 
 **DiagnosedPropertyDescriptor** - Error encountered:
 - `TargetPropertyName`
+
+**ConstructorArgumentDescriptor** - Constructor parameter mapping:
+- `ParameterPosition` - Order in constructor
+- `SourceExpression` - Generated code for parameter
 
 ## Design Principles
 
