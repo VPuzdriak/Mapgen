@@ -6,6 +6,8 @@ using Mapgen.Analyzer.Mapper.MappingDescriptors;
 using Mapgen.Analyzer.Mapper.Metadata;
 using Mapgen.Analyzer.Mapper.Utils;
 
+using Microsoft.CodeAnalysis;
+
 using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Mapgen.Analyzer.Mapper;
@@ -264,7 +266,10 @@ public sealed class MapperTemplateEngine
     builder.AppendLine(mapCollectionMethod + "\n");
 
     var ignoreMemberMethod = GenerateIgnoreMemberMethod(_configMetadata.Method);
-    builder.AppendLine(ignoreMemberMethod);
+    builder.AppendLine(ignoreMemberMethod + "\n");
+
+    var mapEnumMethod = GenerateMapEnumMethod();
+    builder.AppendLine(mapEnumMethod);
 
     return builder.ToString();
   }
@@ -377,7 +382,7 @@ public sealed class MapperTemplateEngine
 
     // Get all public constructors with parameters
     var constructorsWithParams = destinationType.InstanceConstructors
-      .Where(c => c.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public && c.Parameters.Length > 0)
+      .Where(c => c.DeclaredAccessibility == Accessibility.Public && c.Parameters.Length > 0)
       .OrderBy(c => c.Parameters.Length)
       .ToList();
 
@@ -391,11 +396,36 @@ public sealed class MapperTemplateEngine
 
       var sourceParamTypes = string.Join(", ", methodMetadata.Parameters.Select(p => p.TypeSyntax));
 
+      // Collect all members from source parameters to detect type name conflicts
+      var sourceMembers = new List<MemberInfo>();
+      foreach (var sourceParam in methodMetadata.Parameters)
+      {
+        if (sourceParam.Symbol.Type is INamedTypeSymbol sourceType)
+        {
+          sourceMembers.AddRange(sourceType.GetAllMembers());
+        }
+      }
+
+      // Generate parameters with conflict detection
       var parameters = new List<string>();
       foreach (var ctorParam in constructor.Parameters)
       {
-        var paramType = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         var paramName = ctorParam.Name;
+        var parmTypeName = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var paramFullTypeName = ctorParam.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
+        // Check if constructor parameter type conflicts with any source member type
+        var hasConflict = sourceMembers.Any(member =>
+        {
+          var sourceMemberTypeName = member.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+          var sourceMemberFullTypeName = member.Type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+
+          // A conflict occurs if the simple type names are the same but the full type names are different (indicating a naming collision)
+          return sourceMemberTypeName == parmTypeName && sourceMemberFullTypeName != paramFullTypeName;
+        });
+
+        var paramType = hasConflict ? paramFullTypeName : parmTypeName;
+
         parameters.Add($"Expression<Func<{sourceParamTypes}, {paramType}>> {paramName}");
       }
 
@@ -589,6 +619,17 @@ public sealed class MapperTemplateEngine
                  private void {{MappingConfigurationMethods.IgnoreMemberMethodName}}<TDestinationMember>(
                    Expression<Func<{{destinationType}}, TDestinationMember>> destinationMember) {
                    // Mapgen will use this method as mapping configuration.
+                 }
+             """;
+  }
+
+  private string GenerateMapEnumMethod()
+  {
+    return $$"""
+                 private void {{MappingConfigurationMethods.MapEnumMethodName}}<TSourceEnum, TDestinationEnum>()
+                   where TSourceEnum : struct, Enum
+                   where TDestinationEnum : struct, Enum {
+                   // Mapgen will use this method to generate enum mapping methods.
                  }
              """;
   }

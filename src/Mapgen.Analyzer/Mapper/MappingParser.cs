@@ -88,6 +88,62 @@ public class MappingParser
     return includedMappers;
   }
 
+  public List<EnumMappingDeclaration> ParseMapEnumDeclarations(
+    SyntaxNode classNode,
+    CancellationToken ct)
+  {
+    var enumMappings = new List<EnumMappingDeclaration>();
+
+    if (classNode is not ClassDeclarationSyntax classDeclaration)
+    {
+      return enumMappings;
+    }
+
+    var constructor = SyntaxHelpers.FindConstructor(classDeclaration);
+    if (constructor?.Body is null)
+    {
+      return enumMappings;
+    }
+
+    // Find all MapEnum invocations
+    var mapEnumCalls = constructor.Body.Statements
+      .OfType<ExpressionStatementSyntax>()
+      .Select(es => es.Expression)
+      .OfType<InvocationExpressionSyntax>()
+      .Where(inv =>
+        inv.Expression is GenericNameSyntax { Identifier.Text: MappingConfigurationMethods.MapEnumMethodName });
+
+    foreach (var mapEnumCall in mapEnumCalls)
+    {
+      if (ct.IsCancellationRequested)
+      {
+        break;
+      }
+
+      if (mapEnumCall.Expression is not GenericNameSyntax genericName)
+      {
+        continue;
+      }
+
+      // MapEnum should have exactly 2 type arguments: <TSource, TDest>
+      if (genericName.TypeArgumentList.Arguments.Count != 2)
+      {
+        continue;
+      }
+
+      var sourceTypeInfo = _semanticModel.GetTypeInfo(genericName.TypeArgumentList.Arguments[0], ct);
+      var destTypeInfo = _semanticModel.GetTypeInfo(genericName.TypeArgumentList.Arguments[1], ct);
+
+      if (sourceTypeInfo.Type is not null && destTypeInfo.Type is not null)
+      {
+        var location = mapEnumCall.GetLocation();
+        enumMappings.Add(new EnumMappingDeclaration(sourceTypeInfo.Type, destTypeInfo.Type, location));
+      }
+    }
+
+    return enumMappings;
+  }
+
   private void ExtractMappersFromInitializer(
     InitializerExpressionSyntax? initializer,
     List<IncludedMapperInfo> includedMappers,

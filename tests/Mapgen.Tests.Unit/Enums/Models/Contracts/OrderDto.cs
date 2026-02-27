@@ -12,11 +12,11 @@ public sealed class OrderDto
   public required OrderStatusDto? CurrentStatus { get; init; }
   public required IImmutableList<OrderStatusDto> StatusHistory { get; set; }
 
-  public OrderDto(int id, int customerId, OrderPriorityDto orderPriority)
+  public OrderDto(int id, int customerId, OrderPriorityDto orderPriority, CustomerStatusDto customerStatus)
   {
     Id = id;
     CustomerId = customerId;
-    IsVipOrder = orderPriority == OrderPriorityDto.High;
+    IsVipOrder = customerStatus == CustomerStatusDto.Vip || orderPriority == OrderPriorityDto.High;
     StatusHistory = [];
   }
 

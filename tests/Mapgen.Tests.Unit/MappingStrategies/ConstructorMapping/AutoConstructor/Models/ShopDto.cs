@@ -1,5 +1,3 @@
-
-using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace Mapgen.Tests.Unit.MappingStrategies.ConstructorMapping.AutoConstructor.Models;

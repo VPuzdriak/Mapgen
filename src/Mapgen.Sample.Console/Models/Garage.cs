@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Mapgen.Sample.Console.Models;
 
 public class Garage
