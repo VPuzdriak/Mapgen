@@ -1464,6 +1464,332 @@ public ProductMapper(ILogger logger)  // ❌ MAPPER010: Clear error!
 
 **Remember:** These validations only affect mapper constructors, not the mapping methods themselves. Your mapping logic can be as complex as needed using `MapMember()` expressions.
 
+## Explicit Enum Mapping with MapEnum
+
+The `MapEnum<TSource, TDestination>()` method allows you to explicitly declare enum type mappings when enums need to be used in contexts where automatic mapping isn't triggered or when you want to pre-generate helper methods for reuse.
+
+### When to Use MapEnum
+
+**Automatic enum mapping** works in most scenarios:
+- ✅ Property-to-property mappings with matching names
+- ✅ Constructor parameters with matching source properties
+- ✅ Collections of enums
+
+**Use `MapEnum()` when:**
+- 🎯 Enum needs to be mapped but doesn't match any source property name
+- 🎯 Multiple parameters mapping method and enum comes from different parameter
+- 🎯 You want to explicitly generate helper methods for manual use
+- 🎯 Enum is used in complex expressions and you want named helper methods
+
+### Basic Usage
+
+```csharp
+// Source enums
+public enum CustomerStatus { Regular, Premium, Vip }
+public enum OrderPriority { Low, Medium, High }
+
+// Destination enums  
+public enum CustomerStatusDto { Regular, Premium, Vip }
+public enum OrderPriorityDto { Low, Medium, High }
+
+public class Order
+{
+    public int Id { get; set; }
+    public int CustomerId { get; set; }
+    public OrderPriority OrderPriority { get; set; }
+}
+
+public class Customer
+{
+    public int Id { get; set; }
+    public CustomerStatus Status { get; set; }
+}
+
+public class OrderDto
+{
+    public int Id { get; }
+    public int CustomerId { get; }
+    public bool IsVipOrder { get; }
+    
+    public OrderDto(int id, int customerId, OrderPriorityDto priority, CustomerStatusDto customerStatus)
+    {
+        Id = id;
+        CustomerId = customerId;
+        IsVipOrder = priority == OrderPriorityDto.High;
+        // ... use customerStatus
+    }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order, Customer customer);
+    
+    public OrderMapper()
+    {
+        // CustomerStatus needs explicit mapping - no matching property in Order
+        MapEnum<CustomerStatus, CustomerStatusDto>();
+        
+        UseConstructor(
+            (order, customer) => order.Id,
+            (order, customer) => order.CustomerId,
+            // OrderPriority maps automatically via property match
+            (order, customer) => MapToOrderPriorityDto(order.OrderPriority),
+            // CustomerStatus uses explicitly declared MapEnum
+            (order, customer) => MapToCustomerStatusDto(customer.Status)
+        );
+    }
+}
+```
+
+**Generated code:**
+```csharp
+public OrderDto ToDto(Order order, Customer customer)
+{
+    return new OrderDto(
+        order.Id,
+        order.CustomerId,
+        MapToOrderPriorityDto(order.OrderPriority),    // Auto-generated
+        MapToCustomerStatusDto(customer.Status)        // From MapEnum declaration
+    );
+}
+
+// Generated from automatic detection
+private static OrderPriorityDto MapToOrderPriorityDto(OrderPriority value) 
+    => value switch
+    {
+        OrderPriority.Low => OrderPriorityDto.Low,
+        OrderPriority.Medium => OrderPriorityDto.Medium,
+        OrderPriority.High => OrderPriorityDto.High,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+    };
+
+// Generated from MapEnum<CustomerStatus, CustomerStatusDto>()
+private static CustomerStatusDto MapToCustomerStatusDto(CustomerStatus value) 
+    => value switch
+    {
+        CustomerStatus.Regular => CustomerStatusDto.Regular,
+        CustomerStatus.Premium => CustomerStatusDto.Premium,
+        CustomerStatus.Vip => CustomerStatusDto.Vip,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unexpected enum value")
+    };
+
+// Nullable overloads for both
+private static OrderPriorityDto? MapToOrderPriorityDto(OrderPriority? value) 
+    => value.HasValue ? MapToOrderPriorityDto(value.Value) : null;
+
+private static CustomerStatusDto? MapToCustomerStatusDto(CustomerStatus? value) 
+    => value.HasValue ? MapToCustomerStatusDto(value.Value) : null;
+```
+
+### MapEnum vs Automatic Enum Mapping
+
+**Automatic Mapping (No MapEnum needed):**
+```csharp
+public class Product
+{
+    public int Id { get; set; }
+    public ProductStatus Status { get; set; }  // Matches destination property
+}
+
+public class ProductDto
+{
+    public int Id { get; set; }
+    public ProductStatusDto Status { get; set; }  // Same name - auto-mapped!
+}
+
+[Mapper]
+public partial class ProductMapper
+{
+    public partial ProductDto ToDto(Product product);
+    // ✅ Status automatically mapped - no configuration needed
+}
+```
+
+**MapEnum Required:**
+```csharp
+public class Order
+{
+    public int Id { get; set; }
+    // No CustomerStatus property in Order!
+}
+
+public class Customer
+{
+    public CustomerStatus Status { get; set; }
+}
+
+public class OrderDto
+{
+    public OrderDto(int id, CustomerStatusDto customerStatus) { /* ... */ }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order, Customer customer);
+    
+    public OrderMapper()
+    {
+        // ❌ Without MapEnum, no helper method generated for CustomerStatus
+        // ✅ MapEnum generates the helper method
+        MapEnum<CustomerStatus, CustomerStatusDto>();
+        
+        UseConstructor(
+            (order, customer) => order.Id,
+            (order, customer) => MapToCustomerStatusDto(customer.Status)
+        );
+    }
+}
+```
+
+### Using MapEnum with MapMember
+
+You can also use `MapEnum()` to generate helper methods for use in custom property mappings:
+
+```csharp
+public enum OrderStatus { Pending, Processing, Shipped, Delivered }
+public enum OrderStatusDto { Pending, Processing, Shipped, Delivered }
+
+public class Order
+{
+    public int Id { get; set; }
+    public OrderStatus Status { get; set; }
+    public OrderStatus? PreviousStatus { get; set; }
+}
+
+public class OrderDto
+{
+    public int Id { get; set; }
+    public string StatusDisplay { get; set; }
+    public OrderStatusDto? PreviousStatus { get; set; }
+}
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    
+    public OrderMapper()
+    {
+        // Generate helper method for custom expression
+        MapEnum<OrderStatus, OrderStatusDto>();
+        
+        // Use helper in custom mapping
+        MapMember(dto => dto.StatusDisplay, 
+            order => $"Status: {MapToOrderStatusDto(order.Status)}");
+        
+        // PreviousStatus auto-mapped via property match
+    }
+}
+```
+
+### Requirements and Validation
+
+**MapEnum Requirements:**
+- Both type parameters must be enum types
+- All source enum members must exist in destination enum (same as automatic mapping)
+- Member names must match exactly (case-sensitive)
+- Destination enum can have extra members not in source
+
+**Validation:**
+```csharp
+// ❌ ERROR MAPPER012: Source has "Archived" not in destination
+public enum OrderStatus { Active, Pending, Completed, Archived }
+public enum OrderStatusDto { Active, Pending, Completed }
+
+[Mapper]
+public partial class OrderMapper
+{
+    public partial OrderDto ToDto(Order order);
+    
+    public OrderMapper()
+    {
+        MapEnum<OrderStatus, OrderStatusDto>();  // ❌ Error!
+    }
+}
+```
+
+**Fix with custom mapping:**
+```csharp
+public OrderMapper()
+{
+    // Don't use MapEnum - use custom switch expression instead
+    MapMember(dto => dto.Status, order => order.Status switch
+    {
+        OrderStatus.Active => OrderStatusDto.Active,
+        OrderStatus.Pending => OrderStatusDto.Pending,
+        OrderStatus.Completed => OrderStatusDto.Completed,
+        OrderStatus.Archived => OrderStatusDto.Completed,  // Explicit handling
+        _ => throw new ArgumentOutOfRangeException()
+    });
+}
+```
+
+### Generated Helper Method Naming
+
+Helper methods follow the naming convention: `MapTo{DestinationEnumName}`
+
+```csharp
+MapEnum<CustomerStatus, CustomerStatusDto>();
+// Generates: MapToCustomerStatusDto(CustomerStatus value)
+
+MapEnum<OrderPriority, PriorityDto>();  
+// Generates: MapToPriorityDto(OrderPriority value)
+
+MapEnum<ProductCategory, Category>();
+// Generates: MapToCategory(ProductCategory value)
+```
+
+### Benefits of MapEnum
+
+**Code Reuse:**
+```csharp
+public OrderMapper()
+{
+    MapEnum<OrderStatus, OrderStatusDto>();
+    
+    UseConstructor(
+        (order, customer) => order.Id,
+        // Reuse same helper in multiple places
+        (order, customer) => MapToOrderStatusDto(order.CurrentStatus)
+    );
+    
+    MapMember(dto => dto.StatusHistory, 
+        order => order.History.Select(MapToOrderStatusDto).ToList());
+}
+```
+
+**Explicit Intent:**
+```csharp
+public OrderMapper()
+{
+    // Makes it clear that enum mapping is being used
+    MapEnum<CustomerStatus, CustomerStatusDto>();
+    MapEnum<OrderPriority, OrderPriorityDto>();
+    
+    UseConstructor(/* ... */);
+}
+```
+
+**Type Safety:**
+- All enum mappings validated at compile time
+- Name-based mapping ensures semantic correctness
+- Nullable support automatically included
+
+### Summary: MapEnum vs Automatic Mapping
+
+| Scenario | Automatic | MapEnum Required |
+|----------|-----------|------------------|
+| Property name matches | ✅ Auto | ❌ Not needed |
+| Constructor param matches property | ✅ Auto | ❌ Not needed |
+| Enum from different parameter | ❌ | ✅ Required |
+| No matching source property | ❌ | ✅ Required |
+| Custom expressions | ❌ | ✅ Helpful |
+| Explicit helper generation | ❌ | ✅ Use this |
+
+**Best Practice:** Let Mapgen auto-generate enum helpers when possible. Use `MapEnum()` only when automatic detection doesn't apply or when you want explicit control over helper generation.
+
 ## Mapper Composition
 
 Use `IncludeMappers()` to compose mappers together for nested object mappings.
