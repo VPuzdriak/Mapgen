@@ -73,6 +73,11 @@ internal static class SyntaxHelpers
     return usings;
   }
 
+  public static IReadOnlyList<string> FilterAliasUsings(IReadOnlyList<string> usings)
+  {
+    return usings.Where(u => !u.Contains(" = ")).ToList();
+  }
+
   /// <summary>
   /// Finds the method declaration syntax for a given method symbol.
   /// </summary>

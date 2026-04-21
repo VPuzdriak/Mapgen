@@ -15,6 +15,7 @@ namespace Mapgen.Analyzer.Mapper.Metadata
     public MapperMethodMetadata? Method { get; }
     public IReadOnlyList<MapperDiagnostic> Diagnostics { get; }
     public bool NullableEnabled { get; }
+    public bool UseFullNameQualifiers { get; }
 
     public MappingConfigurationMetadata(
       IReadOnlyList<string> usings,
@@ -23,7 +24,8 @@ namespace Mapgen.Analyzer.Mapper.Metadata
       Accessibility mapperAccessibility,
       MapperMethodMetadata? method,
       IReadOnlyList<MapperDiagnostic> diagnostics,
-      bool nullableEnabled)
+      bool nullableEnabled,
+      bool useFullNameQualifiers)
     {
       Usings = usings;
       MapperNamespace = mapperNamespace;
@@ -32,6 +34,7 @@ namespace Mapgen.Analyzer.Mapper.Metadata
       Method = method;
       Diagnostics = diagnostics;
       NullableEnabled = nullableEnabled;
+      UseFullNameQualifiers = useFullNameQualifiers;
     }
   }
 }

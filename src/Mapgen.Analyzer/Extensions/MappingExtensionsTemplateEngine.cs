@@ -41,8 +41,16 @@ public sealed class MappingExtensionsTemplateEngine
     // Ensure required system namespaces are always included
     var requiredUsings = new[] { "System.Collections.Generic" };
 
+    var sourceUsings = _metadata.Usings;
+    
+    // When using fully qualified names, filter out alias usings as they're redundant
+    if (_metadata.UseFullNameQualifiers)
+    {
+      sourceUsings = Mapper.Utils.SyntaxHelpers.FilterAliasUsings(sourceUsings);
+    }
+
     var allUsings = requiredUsings
-      .Concat(_metadata.Usings)
+      .Concat(sourceUsings)
       .Distinct();
 
     foreach (var ns in allUsings)
@@ -67,13 +75,13 @@ public sealed class MappingExtensionsTemplateEngine
 
   private string GenerateExtensionMethod(ExtensionMethodInfo method)
   {
-    var returnType = method.ReturnTypeSyntax;
-    var sourceType = method.ExtensionParameter.TypeSyntax;
+    var returnType = _metadata.UseFullNameQualifiers ? method.ReturnTypeFullyQualifiedSyntax : method.ReturnTypeSyntax;
+    var sourceType = _metadata.UseFullNameQualifiers ? method.ExtensionParameter.TypeFullyQualifiedSyntax : method.ExtensionParameter.TypeSyntax;
 
     var additionalParams = method.AdditionalParameters.Count > 0
       ? ", " + string.Join(", ", method.AdditionalParameters.Select(p =>
       {
-        var paramType = p.TypeSyntax;
+        var paramType = _metadata.UseFullNameQualifiers ? p.TypeFullyQualifiedSyntax : p.TypeSyntax;
         return $"{paramType} {p.Name}";
       }))
       : "";

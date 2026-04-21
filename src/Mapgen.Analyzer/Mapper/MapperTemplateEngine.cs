@@ -51,8 +51,16 @@ public sealed class MapperTemplateEngine
     // Build list of required system namespaces
     var requiredUsings = new List<string> { "System", "System.Collections.Generic", "System.Linq.Expressions" };
 
+    var sourceUsings = _configMetadata.Usings;
+    
+    // When using fully qualified names, filter out alias usings as they're redundant
+    if (_configMetadata.UseFullNameQualifiers)
+    {
+      sourceUsings = SyntaxHelpers.FilterAliasUsings(sourceUsings);
+    }
+
     var allUsings = requiredUsings
-      .Concat(_configMetadata.Usings)
+      .Concat(sourceUsings)
       .Concat(_configMetadata.Method?.RequiredUsings ?? [])
       .Distinct();
 
@@ -95,7 +103,9 @@ public sealed class MapperTemplateEngine
   {
     var accessibility = AccessibilityModifierHelpers.GetAccessibilityModifierString(methodMetadata.MethodAccessibility);
     var parameters = GenerateMethodParameters(methodMetadata);
-    var returnTypeName = methodMetadata.ReturnTypeSyntax;
+    var returnTypeName = _configMetadata.UseFullNameQualifiers 
+      ? methodMetadata.ReturnTypeFullyQualifiedSyntax 
+      : methodMetadata.ReturnTypeSyntax;
 
     // Check if we need to use constructor with parameters
     if (methodMetadata.ConstructorInfo != null)
@@ -129,10 +139,10 @@ public sealed class MapperTemplateEngine
 
   private string GenerateMethodParameters(MapperMethodMetadata methodMetadata)
   {
-    // Use alias-aware type names for parameters, preferring original syntax
+    // Use alias-aware type names for parameters, preferring original syntax unless UseFullNameQualifiers is true
     var parameters = methodMetadata.Parameters.Select(p =>
     {
-      var typeName = p.TypeSyntax;
+      var typeName = _configMetadata.UseFullNameQualifiers ? p.TypeFullyQualifiedSyntax : p.TypeSyntax;
       return $"{typeName} {p.Name}";
     });
     return string.Join(", ", parameters);
@@ -172,7 +182,9 @@ public sealed class MapperTemplateEngine
       return string.Empty;
     }
 
-    var returnTypeName = methodMetadata.ReturnTypeSyntax;
+    var returnTypeName = _configMetadata.UseFullNameQualifiers 
+      ? methodMetadata.ReturnTypeFullyQualifiedSyntax 
+      : methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Get constructor parameter names (from the ConstructorInfo)
@@ -306,11 +318,11 @@ public sealed class MapperTemplateEngine
     // Determine if we need fully qualified names
     var hasNameConflict = sourceType.Name == destType.Name;
 
-    var sourceTypeName = hasNameConflict
+    var sourceTypeName = (_configMetadata.UseFullNameQualifiers || hasNameConflict)
       ? sourceType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
       : sourceType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
-    var destTypeName = hasNameConflict
+    var destTypeName = (_configMetadata.UseFullNameQualifiers || hasNameConflict)
       ? destType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
       : destType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
@@ -394,7 +406,8 @@ public sealed class MapperTemplateEngine
         builder.AppendLine().AppendLine();
       }
 
-      var sourceParamTypes = string.Join(", ", methodMetadata.Parameters.Select(p => p.TypeSyntax));
+      var sourceParamTypes = string.Join(", ", methodMetadata.Parameters.Select(p => 
+        _configMetadata.UseFullNameQualifiers ? p.TypeFullyQualifiedSyntax : p.TypeSyntax));
 
       // Collect all members from source parameters to detect type name conflicts
       var sourceMembers = new List<MemberInfo>();
@@ -424,7 +437,7 @@ public sealed class MapperTemplateEngine
           return sourceMemberTypeName == parmTypeName && sourceMemberFullTypeName != paramFullTypeName;
         });
 
-        var paramType = hasConflict ? paramFullTypeName : parmTypeName;
+        var paramType = (_configMetadata.UseFullNameQualifiers || hasConflict) ? paramFullTypeName : parmTypeName;
 
         parameters.Add($"Expression<Func<{sourceParamTypes}, {paramType}>> {paramName}");
       }
@@ -468,7 +481,9 @@ public sealed class MapperTemplateEngine
 
   private string GenerateMapMemberMethod(MapperMethodMetadata methodMetadata)
   {
-    var destinationType = methodMetadata.ReturnTypeSyntax;
+    var destinationType = _configMetadata.UseFullNameQualifiers 
+      ? methodMetadata.ReturnTypeFullyQualifiedSyntax 
+      : methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Generate overloads for 1 parameter up to the total number of parameters
@@ -485,7 +500,8 @@ public sealed class MapperTemplateEngine
       }
 
       var parameters = methodMetadata.Parameters.Take(paramCount).ToList();
-      var sourceParamTypes = string.Join(", ", parameters.Select(p => p.TypeSyntax));
+      var sourceParamTypes = string.Join(", ", parameters.Select(p => 
+        _configMetadata.UseFullNameQualifiers ? p.TypeFullyQualifiedSyntax : p.TypeSyntax));
       var funcSignature = $"Func<{sourceParamTypes}, TDestinationMember>";
 
       var overload = $$"""
@@ -525,7 +541,9 @@ public sealed class MapperTemplateEngine
   {
     // Generates: MapCollection(dto => dto.Collection, item => item.ToDto())
     // Single property expression: destination collection
-    var destinationType = methodMetadata.ReturnTypeSyntax;
+    var destinationType = _configMetadata.UseFullNameQualifiers 
+      ? methodMetadata.ReturnTypeFullyQualifiedSyntax 
+      : methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Base overload: item only
@@ -544,7 +562,8 @@ public sealed class MapperTemplateEngine
       builder.AppendLine().AppendLine();
 
       var parameters = methodMetadata.Parameters.Take(paramCount).ToList();
-      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p => p.TypeSyntax));
+      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p => 
+        _configMetadata.UseFullNameQualifiers ? p.TypeFullyQualifiedSyntax : p.TypeSyntax));
       var funcSignature = $"Func<{string.Join(", ", paramTypes)}, TDestinationItem>";
 
       var overload = $$"""
@@ -565,7 +584,9 @@ public sealed class MapperTemplateEngine
   {
     // Generates: MapCollection(dto => dto.DtoCollection, source => source.SourceCollection, item => item.ToDto())
     // Two property expressions: destination collection + source collection
-    var destinationType = methodMetadata.ReturnTypeSyntax;
+    var destinationType = _configMetadata.UseFullNameQualifiers 
+      ? methodMetadata.ReturnTypeFullyQualifiedSyntax 
+      : methodMetadata.ReturnTypeSyntax;
     var builder = new StringBuilder();
 
     // Only generate these if there are mapper parameters
@@ -575,7 +596,9 @@ public sealed class MapperTemplateEngine
     }
 
     var firstSourceParam = methodMetadata.Parameters.First();
-    var firstSourceParamType = firstSourceParam.TypeSyntax;
+    var firstSourceParamType = _configMetadata.UseFullNameQualifiers 
+      ? firstSourceParam.TypeFullyQualifiedSyntax 
+      : firstSourceParam.TypeSyntax;
 
     // Base overload: item only
     var baseOverload = $$"""
@@ -594,7 +617,8 @@ public sealed class MapperTemplateEngine
       builder.AppendLine().AppendLine();
 
       var parameters = methodMetadata.Parameters.Take(paramCount).ToList();
-      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p => p.TypeSyntax));
+      var paramTypes = new[] { "TSourceItem" }.Concat(parameters.Select(p => 
+        _configMetadata.UseFullNameQualifiers ? p.TypeFullyQualifiedSyntax : p.TypeSyntax));
       var funcSignature = $"Func<{string.Join(", ", paramTypes)}, TDestinationItem>";
 
       var overload = $$"""
@@ -614,7 +638,9 @@ public sealed class MapperTemplateEngine
 
   private string GenerateIgnoreMemberMethod(MapperMethodMetadata methodMetadata)
   {
-    var destinationType = methodMetadata.ReturnTypeSyntax;
+    var destinationType = _configMetadata.UseFullNameQualifiers 
+      ? methodMetadata.ReturnTypeFullyQualifiedSyntax 
+      : methodMetadata.ReturnTypeSyntax;
     return $$"""
                  private void {{MappingConfigurationMethods.IgnoreMemberMethodName}}<TDestinationMember>(
                    Expression<Func<{{destinationType}}, TDestinationMember>> destinationMember) {

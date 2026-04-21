@@ -10,6 +10,14 @@ namespace Mapgen.Analyzer.Mapper.Metadata;
 
 public sealed class MapperMethodMetadata
 {
+  private static readonly SymbolDisplayFormat _fullyQualifiedFormatWithNullability = new(
+    globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Included,
+    typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+    genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+    miscellaneousOptions: SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
+                          SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
+                          SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
   private readonly List<MapperMethodParameter> _parameters = [];
   private readonly List<BaseMappingDescriptor> _mappings = [];
   private readonly List<MapperDiagnostic> _diagnostics = [];
@@ -21,6 +29,7 @@ public sealed class MapperMethodMetadata
 
   public IMethodSymbol MethodSymbol { get; }
   public string ReturnTypeSyntax { get; }
+  public string ReturnTypeFullyQualifiedSyntax { get; }
   public INamedTypeSymbol ReturnType => (INamedTypeSymbol)MethodSymbol.ReturnType;
   public string ReturnTypeName => MethodSymbol.ReturnType.Name;
   public string MethodName => MethodSymbol.Name;
@@ -45,6 +54,7 @@ public sealed class MapperMethodMetadata
   {
     MethodSymbol = methodSymbol;
     ReturnTypeSyntax = methodDeclarationSyntax.ReturnType.ToString();
+    ReturnTypeFullyQualifiedSyntax = methodSymbol.ReturnType.ToDisplayString(_fullyQualifiedFormatWithNullability);
 
     for (int i = 0; i < methodSymbol.Parameters.Length; i++)
     {

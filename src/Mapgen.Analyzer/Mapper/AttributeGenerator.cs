@@ -24,6 +24,12 @@ public class AttributeGenerator : IIncrementalGenerator
             [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
             public sealed class {{MapgenProject.MapperAttributeClassName}} : Attribute
             {
+                /// <summary>
+                /// Gets or sets a value indicating whether to use fully qualified type names in generated code.
+                /// When set to true, all type references in the generated code will use their full namespace-qualified names.
+                /// Default is false.
+                /// </summary>
+                public bool UseFullNameQualifiers { get; set; }
             }
         }
 
