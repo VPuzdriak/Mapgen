@@ -75,22 +75,7 @@ public class MappingExtensionsGenerator : IIncrementalGenerator
 
     // Detect nullable context
     var nullableEnabled = SyntaxHelpers.IsNullableEnabled(ctx.TargetNode, ctx.SemanticModel);
-
-    // Read UseFullNameQualifiers from attribute
-    var useFullNameQualifiers = false;
-    var mapperAttribute = ctx.Attributes.FirstOrDefault();
-    if (mapperAttribute != null)
-    {
-      foreach (var namedArg in mapperAttribute.NamedArguments)
-      {
-        if (namedArg is { Key: "UseFullNameQualifiers", Value.Value: bool value })
-        {
-          useFullNameQualifiers = value;
-          break;
-        }
-      }
-    }
-
+    var useFullNameQualifiers = SyntaxHelpers.AreFullNameQualifiersEnabled(ctx.TargetNode, ctx.SemanticModel, ctx.Attributes);
     return new MapperExtensionsMetadata(usings, mapperNamespace, mapperClassAccessibility, mapperClassName, extensionMethods, nullableEnabled, useFullNameQualifiers);
   }
 

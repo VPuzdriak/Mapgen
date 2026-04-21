@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 using Microsoft.CodeAnalysis;
@@ -118,6 +119,26 @@ internal static class SyntaxHelpers
     if (compilation.Options is Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions csharpOptions)
     {
       return csharpOptions.NullableContextOptions == NullableContextOptions.Enable;
+    }
+
+    return false;
+  }
+
+  public static bool AreFullNameQualifiersEnabled(SyntaxNode node, SemanticModel semanticModel, ImmutableArray<AttributeData> attributes)
+  {
+    // Read UseFullNameQualifiers from attribute
+    var mapperAttribute = attributes.FirstOrDefault(a => a.AttributeClass?.Name is MapgenProject.MapperAttributeClassName);
+    if (mapperAttribute is null)
+    {
+      return false;
+    }
+
+    foreach (var namedArg in mapperAttribute.NamedArguments)
+    {
+      if (namedArg is { Key: "UseFullNameQualifiers", Value.Value: bool value })
+      {
+        return value;
+      }
     }
 
     return false;
