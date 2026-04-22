@@ -16,3 +16,4 @@ public partial class PersonAliasMapper
     MapMember(dest => dest.Partner, (_, partner) => partner is null ? null : ToContract(partner, null));
   }
 }
+

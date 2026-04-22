@@ -12,8 +12,9 @@ namespace Mapgen.Analyzer.Extensions
     public string MapperClassName { get; }
     public List<ExtensionMethodInfo> ExtensionMethods { get; }
     public bool NullableEnabled { get; }
+    public bool UseFullNameQualifiers { get; }
 
-    public MapperExtensionsMetadata(IReadOnlyList<string> usings, string mapperNamespace, Accessibility mapperClassAccessibility, string mapperClassName, List<ExtensionMethodInfo> extensionMethods, bool nullableEnabled)
+    public MapperExtensionsMetadata(IReadOnlyList<string> usings, string mapperNamespace, Accessibility mapperClassAccessibility, string mapperClassName, List<ExtensionMethodInfo> extensionMethods, bool nullableEnabled, bool useFullNameQualifiers)
     {
       Usings = usings;
       MapperNamespace = mapperNamespace;
@@ -21,6 +22,7 @@ namespace Mapgen.Analyzer.Extensions
       MapperClassName = mapperClassName;
       ExtensionMethods = extensionMethods;
       NullableEnabled = nullableEnabled;
+      UseFullNameQualifiers = useFullNameQualifiers;
     }
   }
 }

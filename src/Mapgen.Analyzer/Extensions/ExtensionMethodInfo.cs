@@ -7,9 +7,18 @@ namespace Mapgen.Analyzer.Extensions
 {
   public sealed class ExtensionMethodInfo
   {
+    private static readonly SymbolDisplayFormat _fullyQualifiedFormatWithNullability = new(
+      globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Included,
+      typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+      genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+      miscellaneousOptions: SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
+                            SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
+                            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     private readonly List<ParameterInfo> _additionalParameters = [];
     public IMethodSymbol MethodSymbol { get; }
     public string ReturnTypeSyntax { get; }
+    public string ReturnTypeFullyQualifiedSyntax { get; }
     public Accessibility Accessibility => MethodSymbol.DeclaredAccessibility;
     public string MethodName => MethodSymbol.Name;
     public ParameterInfo ExtensionParameter { get; }
@@ -19,6 +28,7 @@ namespace Mapgen.Analyzer.Extensions
     {
       MethodSymbol = methodSymbol;
       ReturnTypeSyntax = methodDeclarationSyntax.ReturnType.ToString();
+      ReturnTypeFullyQualifiedSyntax = methodSymbol.ReturnType.ToDisplayString(_fullyQualifiedFormatWithNullability);
 
       var extensionParamSymbol = methodSymbol.Parameters[0];
       ExtensionParameter = new ParameterInfo(extensionParamSymbol, methodDeclarationSyntax.ParameterList.Parameters[0].Type!.ToString());

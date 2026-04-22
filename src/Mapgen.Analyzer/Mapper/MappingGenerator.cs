@@ -59,14 +59,15 @@ namespace Mapgen.Analyzer.Mapper
 
       // Detect nullable context
       var nullableEnabled = SyntaxHelpers.IsNullableEnabled(ctx.TargetNode, ctx.SemanticModel);
-
+      var useFullNameQualifiers = SyntaxHelpers.AreFullNameQualifiersEnabled(ctx.TargetNode, ctx.SemanticModel, ctx.Attributes);
+      
       var classDiagnostics = new List<MapperDiagnostic>();
       // Validate mapper constructor has no parameters
       ValidateMapperConstructor(ctx.TargetNode, mapperName, classDiagnostics);
 
 
       var methodMetadata = TransformMappingMethod(ctx, mapperDeclaration, mapperName, classDiagnostics, ct);
-      return new MappingConfigurationMetadata(usings, mapperNamespace, mapperName, mapperDeclaration.DeclaredAccessibility, methodMetadata, classDiagnostics, nullableEnabled);
+      return new MappingConfigurationMetadata(usings, mapperNamespace, mapperName, mapperDeclaration.DeclaredAccessibility, methodMetadata, classDiagnostics, nullableEnabled, useFullNameQualifiers);
     }
 
     private static void ValidateMapperConstructor(SyntaxNode classNode, string mapperName, List<MapperDiagnostic> classDiagnostics)

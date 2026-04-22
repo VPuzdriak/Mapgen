@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -74,8 +75,8 @@ public class MappingExtensionsGenerator : IIncrementalGenerator
 
     // Detect nullable context
     var nullableEnabled = SyntaxHelpers.IsNullableEnabled(ctx.TargetNode, ctx.SemanticModel);
-
-    return new MapperExtensionsMetadata(usings, mapperNamespace, mapperClassAccessibility, mapperClassName, extensionMethods, nullableEnabled);
+    var useFullNameQualifiers = SyntaxHelpers.AreFullNameQualifiersEnabled(ctx.TargetNode, ctx.SemanticModel, ctx.Attributes);
+    return new MapperExtensionsMetadata(usings, mapperNamespace, mapperClassAccessibility, mapperClassName, extensionMethods, nullableEnabled, useFullNameQualifiers);
   }
 
   private bool TryCreateMethodInfo(IMethodSymbol method, out ExtensionMethodInfo? methodInfo)
