@@ -10,6 +10,7 @@
         <!-- NuGet Package Metadata -->
         <PackageId>Mapgen.Analyzer</PackageId>
         <Version>1.4.0</Version>
+        <PackageIcon>icon.png</PackageIcon>
         <Authors>Volodymyr Puzdriak</Authors>
         <Company>Volodymyr Puzdriak</Company>
         <Description>A high-performance, compile-time object mapper for .NET using source generators. Mapgen generates all mapping code at compile time, providing zero runtime overhead, full type safety, and excellent IDE support.</Description>
@@ -30,9 +31,10 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all"/>
     </ItemGroup>
 
-    <!-- Include the README in the package -->
+    <!-- Include the README and icon in the package -->
     <ItemGroup>
-        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+        <None Include="..\..\icon.png" Pack="true" PackagePath="" Visible="False"/>
+        <None Include="..\..\README.md" Pack="true" PackagePath=""/>
     </ItemGroup>
 
     <!-- Pack the analyzer DLL in the correct location for source generators -->
