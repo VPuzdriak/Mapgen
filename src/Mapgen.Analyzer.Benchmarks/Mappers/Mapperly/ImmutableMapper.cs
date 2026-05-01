@@ -4,7 +4,7 @@ using Riok.Mapperly.Abstractions;
 
 namespace Mapgen.Analyzer.Benchmarks.Mappers.Mapperly;
 
-[Mapper]
+[Riok.Mapperly.Abstractions.Mapper]
 public partial class ImmutableMapper
 {
   [MapperIgnoreSource(nameof(ImmutableEntity.DateOfBirth))]
