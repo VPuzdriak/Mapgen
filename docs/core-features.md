@@ -699,7 +699,7 @@ public partial class UserMapper
 
 ## Fully Qualified Type Names
 
-Mapgen supports using fully qualified type names alongside type aliases. This is particularly useful when:
+Mapgen supports using fully qualified type names alongside types. This is particularly useful when:
 - Working with types that have naming conflicts
 - Dealing with types from different namespaces with the same name
 - Making code more explicit about type origins
@@ -737,6 +737,104 @@ public partial class PersonMapper
     public partial PersonResponse ToDto(Entities.Person source);
 }
 ```
+
+### UseFullNameQualifiers Attribute
+
+When you have types with the same name in different namespaces, you can use the `UseFullNameQualifiers = true` option in the `[Mapper]` attribute to force Mapgen to generate code with fully qualified type names. This eliminates any ambiguity and makes type origins explicit in the generated code.
+
+**When to use:**
+- Types with the same name exist in different namespaces (e.g., `Entity.Product` and `Contract.Product`)
+- You want to avoid `using` aliases in the generated code
+- You prefer explicit fully qualified names for clarity and to prevent namespace collisions
+- You faced a bug where Mapgen cannot resolve the types for some reason. Use this feature as a temporary workaround. Please open an issue if this happens.
+
+- **Example with type name conflict:**
+
+```csharp
+// Entity namespace
+namespace MyApp.Models.Entity
+{
+    public class Product
+    {
+        public int Id { get; set; }
+        public string ProductName { get; set; }
+        public decimal ProductPrice { get; set; }
+    }
+}
+
+// Contract namespace
+namespace MyApp.Models.Contract
+{
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+    }
+}
+
+// Mapper with type aliases
+using ProductEntity = MyApp.Models.Entity.Product;
+using ProductContract = MyApp.Models.Contract.Product;
+
+namespace MyApp.Mappers
+{
+    [Mapper(UseFullNameQualifiers = true)]
+    public partial class ProductMapper
+    {
+        public partial ProductContract ToContract(ProductEntity product);
+
+        public ProductMapper()
+        {
+            MapMember(dest => dest.Name, src => src.ProductName);
+            MapMember(dest => dest.Price, src => src.ProductPrice);
+        }
+    }
+}
+```
+
+**Generated code:**
+
+```csharp
+namespace MyApp.Mappers
+{
+    public partial class ProductMapper
+    {
+        public partial global::MyApp.Models.Contract.Product ToContract(
+            global::MyApp.Models.Entity.Product product)
+        {
+            return new global::MyApp.Models.Contract.Product
+            {
+                Id = product.Id,
+                Name = product.ProductName,
+                Price = product.ProductPrice,
+            };
+        }
+    }
+}
+```
+
+**Without UseFullNameQualifiers** (default):
+```csharp
+// Generated code uses type aliases from the mapper definition
+public partial ProductContract ToContract(ProductEntity product)
+{
+    return new ProductContract
+    {
+        Id = product.Id,
+        Name = product.ProductName,
+        Price = product.ProductPrice,
+    };
+}
+```
+
+**Benefits:**
+- ✅ **No ambiguity** - Type names are always explicit and unambiguous
+- ✅ **No using directives needed** - Generated code doesn't rely on `using` statements
+- ✅ **Clear type origins** - Easy to see exactly which types are being used
+- ✅ **Prevents conflicts** - Eliminates namespace collision issues in generated code
+
+**Note:** We highly recommend to turn this option on if you really need it as it makes the generated code harder to read.
 
 ## Extension Methods
 
