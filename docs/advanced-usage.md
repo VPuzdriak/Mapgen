@@ -672,6 +672,8 @@ public record PersonDto(string FirstName, string LastName, int Age);
 
 Mapgen provides comprehensive diagnostics to help you use constructor mapping correctly.
 
+> **💡 Tip:** For MAPPER008 (Ambiguous Constructor) errors, Mapgen provides [automated code fixes](code-fixes.md#ambiguous-constructor-code-fixes) that let you pick the constructor with a single click!
+
 ### MAPPER007: Parameterized Constructor Required
 
 **When it occurs:** Destination type has a single parameterized constructor, but it cannot be automatically mapped (parameters don't match source properties or types are incompatible).

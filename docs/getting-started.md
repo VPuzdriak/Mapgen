@@ -172,9 +172,52 @@ public ProductMapper()
 }
 ```
 
+## Quick Fixes and IDE Support
+
+Mapgen provides automated code fixes to help you resolve mapping issues quickly:
+
+### Unmapped Properties
+
+When a property cannot be automatically mapped, Mapgen will show an error and offer quick fixes:
+
+```csharp
+[Mapper]
+public partial class PersonMapper
+{
+    public partial PersonDto ToDto(Person source);
+    // ❌ ERROR: Property "FullName" cannot be mapped
+}
+```
+
+**Quick fix options:**
+1. **Add MapMember** - Creates custom mapping configuration
+2. **Add IgnoreMember** - Explicitly ignores the property
+
+Simply press `Ctrl+.` (Visual Studio) or `Alt+Enter` (Rider) on the error to see available fixes!
+
+### Ambiguous Constructors
+
+When the destination type has multiple constructors, Mapgen helps you choose:
+
+```csharp
+public class ProductDto
+{
+    public ProductDto() { }
+    public ProductDto(string name, decimal price) { }
+    // ❌ ERROR: Ambiguous constructor selection
+}
+```
+
+**Quick fix options:**
+- Pick which constructor to use (empty or with parameters)
+- Automatically generates the configuration code
+
+Learn more in the [Code Fixes](code-fixes.md) documentation.
+
 ## Next Steps
 
 - Learn about [Core Features](core-features.md)
 - Explore [Advanced Usage](advanced-usage.md)
+- Discover [Code Fixes](code-fixes.md) for productivity
 - Review [Best Practices](migration/best-practices.md)
 

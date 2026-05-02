@@ -7,6 +7,7 @@ Mapgen is a compile-time, source-generator-based object mapping library for .NET
 - [Getting Started](getting-started.md)
 - [Core Features](core-features.md)
 - [Advanced Usage](advanced-usage.md)
+- [Code Fixes](code-fixes.md)
 - [Best Practices](migration/best-practices.md)
 - [Comparison with Other Libraries](comparison.md)
 - [Migration Guides](migration/)

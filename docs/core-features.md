@@ -697,6 +697,8 @@ public partial class UserMapper
 
 - **Optional fields**: Properties that should remain null/default
 
+> **💡 Tip:** When you encounter unmapped property errors, Mapgen provides [automated code fixes](code-fixes.md#unmapped-property-code-fixes) that can generate `MapMember()` or `IgnoreMember()` configuration with a single click!
+
 ## Fully Qualified Type Names
 
 Mapgen supports using fully qualified type names alongside types. This is particularly useful when:
