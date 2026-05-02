@@ -132,3 +132,127 @@ dotnet build src/Mapgen.Sample.Console/Mapgen.Sample.Console.csproj
 
 The MAPPER001 diagnostic will appear with the code fix hint available in the IDE.
 
+## 2. AmbiguousConstructorCodeFixProvider (MAPPER008)
+
+### Overview
+Provides fixes when a destination type has multiple constructors and none is explicitly specified in the mapper configuration.
+
+### Features
+
+#### 1. Constructor Detection
+- Extracts return type from the mapping method using semantic model
+- Finds all public instance constructors
+- Orders constructors by parameter count (parameterless first)
+
+#### 2. Code Fix Options
+- Provides a parent code action titled "Pick {TypeName} constructor" with nested options:
+  - **Use empty constructor** - Adds `UseEmptyConstructor()` call (if parameterless constructor exists)
+  - **Use {TypeName}(signature)** - For each parameterized constructor, adds `UseConstructor(...)` call with TODO placeholders
+
+#### 3. Constructor Management
+- Automatically finds existing parameterless constructor or creates one
+- Skips fix if constructor has parameters (invalid per MAPPER010)
+- New constructor is inserted after the first mapping method
+- Proper indentation (2 spaces) matching project style
+
+#### 4. Cursor Positioning for UseConstructor
+- Generates `TODO_{parameterName}` placeholders for each constructor parameter
+- Uses `RenameAnnotation.Create()` on the first TODO identifier
+- User can immediately edit and tab through parameters
+- For single-parameter constructors, uses inline format
+- For multi-parameter constructors, uses multi-line format with proper indentation
+
+### Implementation Details
+
+#### Files Created
+1. **AmbiguousConstructorCodeFixProvider.cs**
+   - Full implementation of code fix provider
+   - Nested code actions for each constructor option
+   - Syntax tree manipulation using `SyntaxFactory`
+   - Constructor signature formatting
+
+### Usage Example
+
+Given the following destination type:
+
+```csharp
+public class CustomerDto
+{
+  public string Name { get; set; }
+  public string Email { get; set; }
+  public int Age { get; set; }
+
+  public CustomerDto() { }
+  public CustomerDto(string name, string email) { }
+  public CustomerDto(string name, string email, int age) { }
+}
+```
+
+And a mapper without constructor configuration:
+
+```csharp
+[Mapper]
+public partial class CustomerMapper
+{
+  public partial CustomerDto ToDto(Customer source);
+  
+  public CustomerMapper()
+  {
+    // MAPPER008 diagnostic appears here
+  }
+}
+```
+
+When MAPPER008 diagnostic appears:
+1. IDE shows lightbulb/quick fix icon
+2. Click shows "Pick CustomerDto constructor" with submenu:
+   - "Use empty constructor"
+   - "Use CustomerDto(string name, string email)"
+   - "Use CustomerDto(string name, string email, int age)"
+
+#### Option 1: Use empty constructor
+Generates:
+```csharp
+public CustomerMapper()
+{
+  UseEmptyConstructor();
+}
+```
+
+#### Option 2: Use CustomerDto(string name, string email)
+Generates:
+```csharp
+public CustomerMapper()
+{
+  UseConstructor(
+    source => source.TODO_name,
+    source => source.TODO_email
+  );
+}
+```
+- First `TODO_name` is automatically selected in rename mode
+- User can type the source property and tab to next parameter
+
+#### Option 3: Use CustomerDto(string name, string email, int age)
+Generates:
+```csharp
+public CustomerMapper()
+{
+  UseConstructor(
+    source => source.TODO_name,
+    source => source.TODO_email,
+    source => source.TODO_age
+  );
+}
+```
+
+### Testing
+To test the constructor selection code fix:
+
+```bash
+cd /Volumes/My\ Data/Projects/Pet/Mapgen
+dotnet build tests/Mapgen.Tests.Unit/Mapgen.Tests.Unit.csproj
+```
+
+Comment out the `UseEmptyConstructor()` call in `CustomerMapperEmptyConstructor.cs` to see the MAPPER008 diagnostic and code fix in action.
+
