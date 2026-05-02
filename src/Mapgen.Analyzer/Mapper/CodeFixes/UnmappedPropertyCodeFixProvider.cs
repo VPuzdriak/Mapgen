@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
@@ -19,6 +20,15 @@ namespace Mapgen.Analyzer.Mapper.CodeFixes;
 [Shared]
 public class UnmappedPropertyCodeFixProvider : CodeFixProvider
 {
+  private const string PropertyNameDiagnosticProperty = "propertyName";
+  private const string DestinationParameterName = "dest";
+  private const string SourceParameterName = "src";
+  private const string TodoPlaceholder = "TODO";
+  private const string MapMemberMethodName = "MapMember";
+  private const string IgnoreMemberMethodName = "IgnoreMember";
+  private const string ConstructorIndentation = "  ";
+  private const string StatementIndentation = "    ";
+
   public override ImmutableArray<string> FixableDiagnosticIds => [DiagnosticIds.MissingPropertyMapping];
 
   public override FixAllProvider GetFixAllProvider() => null!; // Disable batch fixing
@@ -34,7 +44,7 @@ public class UnmappedPropertyCodeFixProvider : CodeFixProvider
     var diagnostic = context.Diagnostics.First();
 
     // Extract property name from diagnostic properties
-    if (!diagnostic.Properties.TryGetValue("propertyName", out var propertyName) || string.IsNullOrEmpty(propertyName))
+    if (!diagnostic.Properties.TryGetValue(PropertyNameDiagnosticProperty, out var propertyName) || string.IsNullOrEmpty(propertyName))
     {
       return;
     }
@@ -71,10 +81,29 @@ public class UnmappedPropertyCodeFixProvider : CodeFixProvider
     context.RegisterCodeFix(codeAction, diagnostic);
   }
 
-  private async Task<Document> AddMapMemberAsync(
+  private Task<Document> AddMapMemberAsync(
     Document document,
     ClassDeclarationSyntax classDeclaration,
     string propertyName,
+    CancellationToken cancellationToken)
+  {
+    return AddConfigurationMethodAsync(document, classDeclaration, propertyName, CreateMapMemberStatement, cancellationToken);
+  }
+
+  private Task<Document> AddIgnoreMemberAsync(
+    Document document,
+    ClassDeclarationSyntax classDeclaration,
+    string propertyName,
+    CancellationToken cancellationToken)
+  {
+    return AddConfigurationMethodAsync(document, classDeclaration, propertyName, CreateIgnoreMemberStatement, cancellationToken);
+  }
+
+  private async Task<Document> AddConfigurationMethodAsync(
+    Document document,
+    ClassDeclarationSyntax classDeclaration,
+    string propertyName,
+    Func<string, StatementSyntax> createStatement,
     CancellationToken cancellationToken)
   {
     var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
@@ -83,7 +112,7 @@ public class UnmappedPropertyCodeFixProvider : CodeFixProvider
       return document;
     }
 
-    var (newClass, _) = GetOrCreateConstructor(classDeclaration);
+    var newClass = GetOrCreateConstructor(classDeclaration);
     if (newClass is null)
     {
       return document;
@@ -95,11 +124,8 @@ public class UnmappedPropertyCodeFixProvider : CodeFixProvider
       return document;
     }
 
-    // Create MapMember statement with TODO placeholder
-    var mapMemberStatement = CreateMapMemberStatement(propertyName);
-
-    // Add statement to constructor body
-    var newBody = constructor.Body.AddStatements(mapMemberStatement);
+    var statement = createStatement(propertyName);
+    var newBody = constructor.Body.AddStatements(statement);
     var newConstructor = constructor.WithBody(newBody);
     var finalClass = newClass.ReplaceNode(constructor, newConstructor);
 
@@ -107,138 +133,63 @@ public class UnmappedPropertyCodeFixProvider : CodeFixProvider
     return document.WithSyntaxRoot(newRoot);
   }
 
-  private async Task<Document> AddIgnoreMemberAsync(
-    Document document,
-    ClassDeclarationSyntax classDeclaration,
-    string propertyName,
-    CancellationToken cancellationToken)
-  {
-    var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-    if (root is null)
-    {
-      return document;
-    }
-
-    var (newClass, _) = GetOrCreateConstructor(classDeclaration);
-    if (newClass is null)
-    {
-      return document;
-    }
-
-    var constructor = SyntaxHelpers.FindConstructor(newClass);
-    if (constructor?.Body is null)
-    {
-      return document;
-    }
-
-    // Create IgnoreMember statement
-    var ignoreMemberStatement = CreateIgnoreMemberStatement(propertyName);
-
-    // Add statement to constructor body
-    var newBody = constructor.Body.AddStatements(ignoreMemberStatement);
-    var newConstructor = constructor.WithBody(newBody);
-    var finalClass = newClass.ReplaceNode(constructor, newConstructor);
-
-    var newRoot = root.ReplaceNode(classDeclaration, finalClass);
-    return document.WithSyntaxRoot(newRoot);
-  }
-
-  private (ClassDeclarationSyntax? newClass, bool constructorCreated) GetOrCreateConstructor(ClassDeclarationSyntax classDeclaration)
+  private ClassDeclarationSyntax? GetOrCreateConstructor(ClassDeclarationSyntax classDeclaration)
   {
     var existingConstructor = SyntaxHelpers.FindConstructor(classDeclaration);
 
     // If constructor exists with parameters, skip (invalid mapper per MAPPER010)
     if (existingConstructor?.ParameterList.Parameters.Count > 0)
     {
-      return (null, false);
+      return null;
     }
 
     // If constructor already exists, return as-is
     if (existingConstructor is not null)
     {
-      return (classDeclaration, false);
+      return classDeclaration;
     }
 
-    // Create new constructor
-    var className = classDeclaration.Identifier.Text;
-    var constructor = SyntaxFactory.ConstructorDeclaration(className)
+    // Create new parameterless constructor
+    var constructor = SyntaxFactory.ConstructorDeclaration(classDeclaration.Identifier.Text)
       .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
       .WithParameterList(SyntaxFactory.ParameterList())
       .WithBody(SyntaxFactory.Block())
-      .WithLeadingTrivia(SyntaxFactory.Whitespace("  ")) // Indentation
+      .WithLeadingTrivia(SyntaxFactory.Whitespace(ConstructorIndentation))
       .WithTrailingTrivia(SyntaxFactory.EndOfLine("\n"));
 
-    // Find the first method to insert constructor after it
+    // Insert constructor after first method, or at the end if no methods exist
     var firstMethod = classDeclaration.Members.OfType<MethodDeclarationSyntax>().FirstOrDefault();
-
-    ClassDeclarationSyntax newClass;
-    if (firstMethod is not null)
-    {
-      var methodIndex = classDeclaration.Members.IndexOf(firstMethod);
-      var members = classDeclaration.Members.Insert(methodIndex + 1, constructor);
-      newClass = classDeclaration.WithMembers(members);
-    }
-    else
-    {
-      // No method found, add at the end
-      newClass = classDeclaration.AddMembers(constructor);
-    }
-
-    return (newClass, true);
+    return firstMethod is not null
+      ? classDeclaration.WithMembers(classDeclaration.Members.Insert(classDeclaration.Members.IndexOf(firstMethod) + 1, constructor))
+      : classDeclaration.AddMembers(constructor);
   }
 
   private StatementSyntax CreateMapMemberStatement(string propertyName)
   {
     // Create: MapMember(dest => dest.PropertyName, src => src.TODO)
-    // where TODO is marked with RenameAnnotation for immediate editing
+    var template = $"{MapMemberMethodName}({DestinationParameterName} => {DestinationParameterName}.{propertyName}, {SourceParameterName} => {SourceParameterName}.{TodoPlaceholder});";
+    var statement = SyntaxFactory.ParseStatement(template);
 
-    // dest => dest.PropertyName
-    var destParameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier("dest"));
-    var destPropertyAccess = SyntaxFactory.MemberAccessExpression(
-      SyntaxKind.SimpleMemberAccessExpression,
-      SyntaxFactory.IdentifierName("dest"),
-      SyntaxFactory.IdentifierName(propertyName));
-    var destLambda = SyntaxFactory.SimpleLambdaExpression(destParameter, destPropertyAccess);
+    // Find and annotate the TODO identifier for rename functionality
+    var todoIdentifier = statement.DescendantNodes()
+      .OfType<IdentifierNameSyntax>()
+      .FirstOrDefault(id => id.Identifier.Text == TodoPlaceholder);
 
-    // src => src.TODO (with RenameAnnotation on TODO)
-    var srcParameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier("src"));
-    var todoIdentifier = SyntaxFactory.IdentifierName("TODO")
-      .WithAdditionalAnnotations(RenameAnnotation.Create());
-    var srcPropertyAccess = SyntaxFactory.MemberAccessExpression(
-      SyntaxKind.SimpleMemberAccessExpression,
-      SyntaxFactory.IdentifierName("src"),
-      todoIdentifier);
-    var srcLambda = SyntaxFactory.SimpleLambdaExpression(srcParameter, srcPropertyAccess);
+    if (todoIdentifier is not null)
+    {
+      var annotatedIdentifier = todoIdentifier.WithAdditionalAnnotations(RenameAnnotation.Create());
+      statement = statement.ReplaceNode(todoIdentifier, annotatedIdentifier);
+    }
 
-    // MapMember invocation
-    var mapMemberInvocation = SyntaxFactory.InvocationExpression(
-      SyntaxFactory.IdentifierName("MapMember"),
-      SyntaxFactory.ArgumentList(
-        SyntaxFactory.SeparatedList([SyntaxFactory.Argument(destLambda), SyntaxFactory.Argument(srcLambda)])));
-
-    return SyntaxFactory.ExpressionStatement(mapMemberInvocation)
-      .WithLeadingTrivia(SyntaxFactory.Whitespace("    ")); // Indentation for statement inside constructor
+    return statement.WithLeadingTrivia(SyntaxFactory.Whitespace(StatementIndentation));
   }
 
   private StatementSyntax CreateIgnoreMemberStatement(string propertyName)
   {
     // Create: IgnoreMember(dest => dest.PropertyName)
+    var template = $"{IgnoreMemberMethodName}({DestinationParameterName} => {DestinationParameterName}.{propertyName});";
+    var statement = SyntaxFactory.ParseStatement(template);
 
-    // dest => dest.PropertyName
-    var destParameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier("dest"));
-    var destPropertyAccess = SyntaxFactory.MemberAccessExpression(
-      SyntaxKind.SimpleMemberAccessExpression,
-      SyntaxFactory.IdentifierName("dest"),
-      SyntaxFactory.IdentifierName(propertyName));
-    var destLambda = SyntaxFactory.SimpleLambdaExpression(destParameter, destPropertyAccess);
-
-    // IgnoreMember invocation
-    var ignoreMemberInvocation = SyntaxFactory.InvocationExpression(
-      SyntaxFactory.IdentifierName("IgnoreMember"),
-      SyntaxFactory.ArgumentList(
-        SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(destLambda))));
-
-    return SyntaxFactory.ExpressionStatement(ignoreMemberInvocation)
-      .WithLeadingTrivia(SyntaxFactory.Whitespace("    ")); // Indentation for statement inside constructor
+    return statement.WithLeadingTrivia(SyntaxFactory.Whitespace(StatementIndentation));
   }
 }
