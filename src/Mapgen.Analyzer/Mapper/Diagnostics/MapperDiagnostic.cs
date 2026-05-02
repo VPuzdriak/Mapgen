@@ -13,13 +13,15 @@ public sealed class MapperDiagnostic
   public DiagnosticSeverity Severity { get; }
   public Location? Location { get; }
   public object[] MessageArgs { get; }
+  public string? PropertyName { get; }
 
-  public MapperDiagnostic(
+  private MapperDiagnostic(
     string id,
     string title,
     string messageFormat,
     DiagnosticSeverity severity,
     Location? location,
+    string? propertyName = null,
     params object[] messageArgs)
   {
     Id = id;
@@ -28,6 +30,7 @@ public sealed class MapperDiagnostic
     Severity = severity;
     Location = location;
     MessageArgs = messageArgs;
+    PropertyName = propertyName;
   }
 
   public static MapperDiagnostic LambdaBlockNotSupported(Location? location, string methodName)
@@ -57,11 +60,15 @@ public sealed class MapperDiagnostic
       $"\"{{0}}\" type has \"{{1}}\" {memberType} which does not exist in \"{{2}}\" type. Please, add custom mapping using {{3}}() or ignore this {memberType} explicitly using {{4}}().",
       severity: DiagnosticSeverity.Error,
       location: location,
-      returnTypeName,
-      memberName,
-      sourceTypeName,
-      mapMemberMethodName,
-      ignoreMemberMethodName);
+      propertyName: memberName,
+      messageArgs:
+      [
+        returnTypeName,
+        memberName,
+        sourceTypeName,
+        mapMemberMethodName,
+        ignoreMemberMethodName
+      ]);
   }
 
   public static MapperDiagnostic MultipleMappingMethods(

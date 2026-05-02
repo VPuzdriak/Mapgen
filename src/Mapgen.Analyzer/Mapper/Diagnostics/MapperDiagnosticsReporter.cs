@@ -1,4 +1,6 @@
-﻿using Mapgen.Analyzer.Mapper.Metadata;
+﻿using System.Collections.Immutable;
+
+using Mapgen.Analyzer.Mapper.Metadata;
 
 using Microsoft.CodeAnalysis;
 
@@ -19,9 +21,14 @@ namespace Mapgen.Analyzer.Mapper.Diagnostics
           mapperDiagnostic.Severity,
           isEnabledByDefault: true);
 
+        var properties = mapperDiagnostic.PropertyName != null
+          ? ImmutableDictionary<string, string?>.Empty.Add("propertyName", mapperDiagnostic.PropertyName)
+          : null;
+
         var diagnostic = Diagnostic.Create(
           descriptor,
           mapperDiagnostic.Location,
+          properties,
           mapperDiagnostic.MessageArgs);
 
         ctx.ReportDiagnostic(diagnostic);
@@ -40,9 +47,14 @@ namespace Mapgen.Analyzer.Mapper.Diagnostics
             mapperDiagnostic.Severity,
             isEnabledByDefault: true);
 
+          var properties = mapperDiagnostic.PropertyName != null
+            ? ImmutableDictionary<string, string?>.Empty.Add("propertyName", mapperDiagnostic.PropertyName)
+            : null;
+
           var diagnostic = Diagnostic.Create(
             descriptor,
             mapperDiagnostic.Location,
+            properties,
             mapperDiagnostic.MessageArgs);
 
           ctx.ReportDiagnostic(diagnostic);
