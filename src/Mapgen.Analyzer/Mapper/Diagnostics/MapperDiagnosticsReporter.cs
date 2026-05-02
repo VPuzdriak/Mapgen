@@ -21,9 +21,9 @@ namespace Mapgen.Analyzer.Mapper.Diagnostics
           mapperDiagnostic.Severity,
           isEnabledByDefault: true);
 
-        var properties = mapperDiagnostic.PropertyName != null
+        var properties = mapperDiagnostic.PropertyName is not null
           ? ImmutableDictionary<string, string?>.Empty.Add("propertyName", mapperDiagnostic.PropertyName)
-          : null;
+          : ImmutableDictionary<string, string?>.Empty;
 
         var diagnostic = Diagnostic.Create(
           descriptor,
@@ -49,7 +49,7 @@ namespace Mapgen.Analyzer.Mapper.Diagnostics
 
           var properties = mapperDiagnostic.PropertyName != null
             ? ImmutableDictionary<string, string?>.Empty.Add("propertyName", mapperDiagnostic.PropertyName)
-            : null;
+            : ImmutableDictionary<string, string?>.Empty;
 
           var diagnostic = Diagnostic.Create(
             descriptor,

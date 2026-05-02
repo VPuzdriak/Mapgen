@@ -21,8 +21,8 @@ public sealed class MapperDiagnostic
     string messageFormat,
     DiagnosticSeverity severity,
     Location? location,
-    string? propertyName = null,
-    params object[] messageArgs)
+    string? propertyName,
+    object[] messageArgs)
   {
     Id = id;
     Title = title;
@@ -41,7 +41,8 @@ public sealed class MapperDiagnostic
       messageFormat: "Lambda block expressions are not supported as they are not memory friendly. Use a simple expression or a method reference in {0}().",
       severity: DiagnosticSeverity.Error,
       location: location,
-      methodName);
+      propertyName: null,
+      messageArgs: [methodName]);
   }
 
   public static MapperDiagnostic MissingPropertyMapping(
@@ -82,8 +83,12 @@ public sealed class MapperDiagnostic
       messageFormat: "\"{0}\" can have only one mapping method. Create a new class and place \"{1}()\" there.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      mapperClassName,
-      methodName);
+      propertyName: null,
+      messageArgs:
+      [
+        mapperClassName,
+        methodName
+      ]);
   }
 
   public static MapperDiagnostic TypeMismatchInDirectMapping(
@@ -102,12 +107,16 @@ public sealed class MapperDiagnostic
       messageFormat: $"Direct mapping cannot be used because {memberTypeText} \"{{0}}.{{1}}\" is of type \"{{2}}\" and \"{{3}}.{{1}}\" is of type \"{{4}}\". Use {{5}}() to create custom mapping.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      destinationTypeName,
-      memberName,
-      destinationMemberType,
-      sourceTypeName,
-      sourceMemberType,
-      mapMemberMethodName);
+      propertyName: null,
+      messageArgs:
+      [
+        destinationTypeName,
+        memberName,
+        destinationMemberType,
+        sourceTypeName,
+        sourceMemberType,
+        mapMemberMethodName
+      ]);
   }
 
   public static MapperDiagnostic NullableToNonNullableMismatch(
@@ -127,12 +136,16 @@ public sealed class MapperDiagnostic
       $"Direct mapping cannot be used because {memberTypeText} \"{{0}}.{{1}}\" is of type \"{{2}}\" and \"{{3}}.{{1}}\" is of type \"{{4}}\". This can cause NullReferenceException at runtime. Use {{5}}() to create custom mapping with explicit null handling.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      destinationTypeName,
-      memberName,
-      destinationMemberType,
-      sourceTypeName,
-      sourceMemberType,
-      mapMemberMethodName);
+      propertyName: null,
+      messageArgs:
+      [
+        destinationTypeName,
+        memberName,
+        destinationMemberType,
+        sourceTypeName,
+        sourceMemberType,
+        mapMemberMethodName
+      ]);
   }
 
   public static MapperDiagnostic RequiredMemberCannotBeIgnored(
@@ -145,7 +158,8 @@ public sealed class MapperDiagnostic
       messageFormat: "Member \"{0}\" can't be ignored because it has required keyword.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      propertyName);
+      propertyName: propertyName,
+      messageArgs: [propertyName]);
   }
 
   public static MapperDiagnostic IncompatibleEnumMapping(
@@ -166,13 +180,17 @@ public sealed class MapperDiagnostic
       $"Enum {memberTypeText} \"{{0}}.{{1}}\" of type \"{{2}}\" cannot be automatically mapped from \"{{3}}.{{1}}\" of type \"{{4}}\" because source enum has members not present in destination: {{5}}. Use {{6}}() to create custom mapping with explicit handling for these values.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      destinationTypeName,
-      memberName,
-      destinationEnumType,
-      sourceTypeName,
-      sourceEnumType,
-      string.Join(", ", missingMembers.Select(m => $"\"{m}\"")),
-      mapMemberMethodName);
+      propertyName: memberName,
+      messageArgs:
+      [
+        destinationTypeName,
+        memberName,
+        destinationEnumType,
+        sourceTypeName,
+        sourceEnumType,
+        string.Join(", ", missingMembers.Select(m => $"\"{m}\"")),
+        mapMemberMethodName
+      ]);
   }
 
   public static MapperDiagnostic ParameterizedConstructorRequired(
@@ -187,8 +205,12 @@ public sealed class MapperDiagnostic
       "Cannot generate mapping to \"{0}\". Type has constructor(s) with parameters but no parameterless constructor. Use UseConstructor() to specify how to map constructor parameters.\n\nAvailable constructors:\n{1}",
       severity: DiagnosticSeverity.Error,
       location: location,
-      destinationType,
-      constructorSignatures);
+      propertyName: null,
+      messageArgs:
+      [
+        destinationType,
+        constructorSignatures
+      ]);
   }
 
   public static MapperDiagnostic AmbiguousConstructorSelection(
@@ -203,8 +225,12 @@ public sealed class MapperDiagnostic
       "Cannot generate mapping to \"{0}\". Type has multiple constructors. Use UseConstructor() to specify which constructor parameters to use, or UseEmptyConstructor() to use the parameterless constructor.\n\nAvailable constructors:\n{1}",
       severity: DiagnosticSeverity.Error,
       location: location,
-      destinationType,
-      constructorSignatures);
+      propertyName: null,
+      messageArgs:
+      [
+        destinationType,
+        constructorSignatures
+      ]);
   }
 
   public static MapperDiagnostic UseEmptyConstructorNotPossible(
@@ -219,8 +245,12 @@ public sealed class MapperDiagnostic
       "Cannot use UseEmptyConstructor() for type \"{0}\" because it has no parameterless constructor. Use UseConstructor() instead to specify constructor parameters.\n\nAvailable constructors:\n{1}",
       severity: DiagnosticSeverity.Error,
       location: location,
-      destinationType,
-      constructorSignatures);
+      propertyName: null,
+      messageArgs:
+      [
+        destinationType,
+        constructorSignatures
+      ]);
   }
 
   public static MapperDiagnostic MapperConstructorWithParameters(
@@ -234,7 +264,11 @@ public sealed class MapperDiagnostic
       "Mapper class \"{0}\" constructor cannot have parameters. Mapper constructors should be parameterless and only contain configuration method calls",
       severity: DiagnosticSeverity.Error,
       location: location,
-      mapperClassName);
+      propertyName: null,
+      messageArgs:
+      [
+        mapperClassName
+      ]);
   }
 
   public static MapperDiagnostic InvalidConstructorStatement(Location? location, string mapperClassName)
@@ -246,7 +280,11 @@ public sealed class MapperDiagnostic
       "Mapper class \"{0}\" constructor can only contain calls to mapping configuration methods. Variable declarations, branches, and other statements are not allowed.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      mapperClassName);
+      propertyName: null,
+      messageArgs:
+      [
+        mapperClassName
+      ]);
   }
 
   public static MapperDiagnostic IncompatibleStandaloneEnumMapping(
@@ -262,8 +300,12 @@ public sealed class MapperDiagnostic
       "Enum type \"{0}\" cannot be automatically mapped to \"{1}\" because source enum has members not present in destination: {2}. Remove the MapEnum() call and make mapping manually or add missing members to the destination enum.",
       severity: DiagnosticSeverity.Error,
       location: location,
-      sourceEnumType,
-      destEnumType,
-      string.Join(", ", missingMembers.Select(m => $"\"{m}\"")));
+      propertyName: null,
+      messageArgs:
+      [
+        sourceEnumType,
+        destEnumType,
+        string.Join(", ", missingMembers.Select(m => $"\"{m}\""))
+      ]);
   }
 }
