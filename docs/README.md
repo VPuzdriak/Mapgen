@@ -7,6 +7,7 @@ Mapgen is a compile-time, source-generator-based object mapping library for .NET
 - [Getting Started](getting-started.md)
 - [Core Features](core-features.md)
 - [Advanced Usage](advanced-usage.md)
+- [Code Fixes](code-fixes.md)
 - [Best Practices](migration/best-practices.md)
 - [Comparison with Other Libraries](comparison.md)
 - [Migration Guides](migration/)
@@ -82,14 +83,14 @@ var carDto = car.ToCarDto();
 ## Installation
 
 ```bash
-dotnet add package Mapgen.Analyzer --version 1.1.0
+dotnet add package Mapgen.Analyzer --version 1.5.0
 ```
 
 Or add to your `.csproj`:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.1.0">
+    <PackageReference Include="Mapgen.Analyzer" Version="1.5.0">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

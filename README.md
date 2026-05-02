@@ -53,6 +53,7 @@ var userDto = user.ToDto();  // Extension method, auto-generated!
 
 ### Advanced Topics
 - **[Advanced Usage](docs/advanced-usage.md)** - Complex mapping scenarios
+- **[Code Fixes](docs/code-fixes.md)** - Automated code fixes for common mapping issues
 - **[Comparison with Other Libraries](docs/comparison.md)** - How Mapgen compares to AutoMapper, Mapster, and Mapperly
 - **[Architecture](docs/architecture.md)** - Internal architecture and source generator design
 
@@ -288,7 +289,7 @@ dotnet add package Mapgen.Analyzer
 ### Package Reference
 ```xml
 <ItemGroup>
-    <PackageReference Include="Mapgen.Analyzer" Version="1.4.0" 
+    <PackageReference Include="Mapgen.Analyzer" Version="1.5.0" 
                       OutputItemType="Analyzer" 
                       ReferenceOutputAssembly="false"/>
 </ItemGroup>
