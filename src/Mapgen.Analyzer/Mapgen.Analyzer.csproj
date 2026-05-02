@@ -9,7 +9,7 @@
         
         <!-- NuGet Package Metadata -->
         <PackageId>Mapgen.Analyzer</PackageId>
-        <Version>1.4.0</Version>
+        <Version>1.5.0</Version>
         <PackageIcon>icon.png</PackageIcon>
         <Authors>Volodymyr Puzdriak</Authors>
         <Company>Volodymyr Puzdriak</Company>
