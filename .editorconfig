@@ -362,3 +362,4 @@ dotnet_diagnostic.CS8618.severity = error # Nullability of reference types in va
 
 dotnet_diagnostic.CA2016.severity = error # Require forwarding the cancellation token to async methods
 dotnet_diagnostic.CS0162.severity = error # Remove unreachable code
+dotnet_diagnostic.RS1038.severity = none # Allow code fix providers in the same assembly as the analyzer
